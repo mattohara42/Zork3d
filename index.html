@@ -154,7 +154,6 @@ const gameState = {
   has_lamp_lit: false,
   flags: {
     mailbox_open: false,
-    trapdoor_locked: true,
     window_open: false
   }
 };
@@ -247,18 +246,11 @@ const rooms = {
   west_of_house: {
     id: 'west_of_house',
     name: 'West of House',
-    text: "You are standing in an open field west of a white house, with a boarded front door. There is a small mailbox here, and a wooden trapdoor is set into the ground nearby.",
+    text: "You are standing in an open field west of a white house, with a boarded front door. There is a small mailbox here.",
     exits: {
       north: 'north_of_house',
       south: 'south_of_house',
-      east: null, // front door is boarded - blocked for now
-      down: 'cellar'
-    },
-    // Movement guards: run before an exit is taken. Returning a string
-    // blocks the move and shows that message instead; returning null/undefined
-    // lets it through.
-    exitGuards: {
-      down: () => (gameState.flags.trapdoor_locked ? "The trapdoor is closed." : null)
+      east: null // front door is boarded - blocked for now
     },
     // Built as a stage set around the fixed camera at (0,0,0): the ground
     // sits EYE_HEIGHT below the player, everything else stacks up from there.
@@ -310,19 +302,6 @@ const rooms = {
         leafletMesh.position.set(2, groundY + 0.8, -3);
         group.add(leafletMesh);
       }
-
-      // Trapdoor - flush with the ground when closed, propped open on end
-      // when unlocked, revealing the passage down into the cellar.
-      const trapdoorGeo = new THREE.BoxGeometry(1.2, 0.1, 1.2);
-      const trapdoorMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2f });
-      const trapdoor = new THREE.Mesh(trapdoorGeo, trapdoorMat);
-      if (gameState.flags.trapdoor_locked) {
-        trapdoor.position.set(-2, groundY + 0.05, -4);
-      } else {
-        trapdoor.rotation.z = Math.PI / 2.3;
-        trapdoor.position.set(-2.5, groundY + 0.6, -4);
-      }
-      group.add(trapdoor);
 
       sceneRef.add(group);
       return group;
@@ -382,7 +361,7 @@ const rooms = {
   south_of_house: {
     id: 'south_of_house',
     name: 'South of House',
-    text: "You are facing the south side of a white house. All the windows on this side are boarded. A path wraps around the house in both directions.",
+    text: "You are facing the south side of a white house. There is no door here, and all the windows are boarded.",
     exits: {
       north: 'west_of_house',
       east: 'behind_house'
@@ -408,14 +387,14 @@ const rooms = {
   behind_house: {
     id: 'behind_house',
     name: 'Behind House',
-    text: "You are behind the white house. A path leads around the house to the north and south. A window is set into the wall here.",
+    text: "You are behind the white house. In one corner of the house there is a small window which is slightly ajar.",
     exits: {
       west: 'north_of_house',
       south: 'south_of_house',
       in: 'kitchen'
     },
     exitGuards: {
-      in: () => (gameState.flags.window_open ? null : "The window is closed.")
+      in: () => (gameState.flags.window_open ? null : "The window is not open wide enough to enter.")
     },
     render3D: function(sceneRef) {
       const group = new THREE.Group();
@@ -448,7 +427,7 @@ const rooms = {
   kitchen: {
     id: 'kitchen',
     name: 'Kitchen',
-    text: "You are in the kitchen of the white house. A sturdy wooden table stands in the corner. The window behind you leads back outside.",
+    text: "You are in the kitchen of the white house. A table seems to have been used recently for the preparation of food. To the east is a small window which is open.",
     exits: {
       out: 'behind_house'
     },
@@ -492,44 +471,6 @@ const rooms = {
         leg.position.set(x, groundY + 0.375, z);
         group.add(leg);
       });
-
-      sceneRef.add(group);
-      return group;
-    }
-  },
-
-  cellar: {
-    id: 'cellar',
-    name: 'Cellar',
-    text: "You are in a dark and musty cellar. A dirt floor and rough stone walls surround you. A passage leads up.",
-    dark: true,
-    exits: {
-      up: 'west_of_house'
-    },
-    render3D: function(sceneRef) {
-      const group = new THREE.Group();
-      const groundY = -EYE_HEIGHT;
-
-      const floorGeo = new THREE.PlaneGeometry(10, 10);
-      const floorMat = new THREE.MeshStandardMaterial({ color: 0x4a3f30 });
-      const floor = new THREE.Mesh(floorGeo, floorMat);
-      floor.rotation.x = -Math.PI / 2;
-      floor.position.y = groundY;
-      group.add(floor);
-
-      const wallMat = new THREE.MeshStandardMaterial({ color: 0x555550 });
-      const backWall = new THREE.Mesh(new THREE.BoxGeometry(10, 3, 0.3), wallMat);
-      backWall.position.set(0, groundY + 1.5, -6);
-      group.add(backWall);
-
-      const sideWallGeo = new THREE.BoxGeometry(0.3, 3, 10);
-      const leftWall = new THREE.Mesh(sideWallGeo, wallMat);
-      leftWall.position.set(-5, groundY + 1.5, -1);
-      group.add(leftWall);
-
-      const rightWall = new THREE.Mesh(sideWallGeo, wallMat);
-      rightWall.position.set(5, groundY + 1.5, -1);
-      group.add(rightWall);
 
       sceneRef.add(group);
       return group;
@@ -691,18 +632,6 @@ function handleOpen(noun) {
     }
     return;
   }
-  if (noun === 'trapdoor') {
-    if (gameState.current_room !== 'west_of_house') {
-      setMessage("You don't see a trapdoor here.");
-    } else if (!gameState.flags.trapdoor_locked) {
-      setMessage("It is already open.");
-    } else {
-      gameState.flags.trapdoor_locked = false;
-      rebuildCurrentRoomVisuals();
-      setMessage("You heave the trapdoor open, revealing a passage down into darkness.");
-    }
-    return;
-  }
   if (noun === 'window') {
     if (gameState.current_room !== 'behind_house') {
       setMessage("You don't see a window here.");
@@ -711,7 +640,7 @@ function handleOpen(noun) {
     } else {
       gameState.flags.window_open = true;
       rebuildCurrentRoomVisuals();
-      setMessage("With some effort, you pry the window open.");
+      setMessage("With great effort, you open the window far enough to allow entry.");
     }
     return;
   }
@@ -728,18 +657,6 @@ function handleClose(noun) {
       gameState.flags.mailbox_open = false;
       rebuildCurrentRoomVisuals();
       setMessage("Closed.");
-    }
-    return;
-  }
-  if (noun === 'trapdoor') {
-    if (gameState.current_room !== 'west_of_house') {
-      setMessage("You don't see a trapdoor here.");
-    } else if (gameState.flags.trapdoor_locked) {
-      setMessage("It is already closed.");
-    } else {
-      gameState.flags.trapdoor_locked = true;
-      rebuildCurrentRoomVisuals();
-      setMessage("You lower the trapdoor closed.");
     }
     return;
   }
@@ -799,23 +716,13 @@ function handleExamine(noun) {
     }
     return;
   }
-  if (noun === 'trapdoor') {
-    if (gameState.current_room !== 'west_of_house') {
-      setMessage("You don't see a trapdoor here.");
-    } else {
-      setMessage(gameState.flags.trapdoor_locked
-        ? "A closed wooden trapdoor is set into the ground."
-        : "The open trapdoor reveals a passage leading down into darkness.");
-    }
-    return;
-  }
   if (noun === 'window') {
     if (gameState.current_room !== 'behind_house') {
       setMessage("You don't see a window here.");
     } else {
       setMessage(gameState.flags.window_open
-        ? "The window is open, just wide enough to climb through."
-        : "The window is closed, but it doesn't look locked.");
+        ? "The window is open."
+        : "The window is slightly ajar.");
     }
     return;
   }
@@ -823,7 +730,7 @@ function handleExamine(noun) {
     if (gameState.current_room !== 'kitchen') {
       setMessage("You don't see that here.");
     } else {
-      setMessage("A plain wooden table, empty except for a thin layer of dust.");
+      setMessage("A table seems to have been used recently for the preparation of food.");
     }
     return;
   }
