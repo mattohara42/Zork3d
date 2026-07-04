@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Zork 3D</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #000;
+    font-family: 'Courier New', Courier, monospace;
+  }
+
+  #scene-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  #ui-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 16px 24px;
+    background: linear-gradient(to top, rgba(0,0,0,0.92), rgba(0,0,0,0.75) 70%, rgba(0,0,0,0));
+    color: #d8f5d8;
+    pointer-events: none;
+  }
+
+  #room-name {
+    margin: 0 0 6px 0;
+    font-size: 20px;
+    font-weight: bold;
+    color: #9fffa0;
+    text-shadow: 0 0 6px rgba(80, 255, 80, 0.5);
+    letter-spacing: 1px;
+  }
+
+  #room-text {
+    margin: 0 0 12px 0;
+    font-size: 15px;
+    line-height: 1.4;
+    max-width: 800px;
+    color: #d8f5d8;
+  }
+
+  #controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    pointer-events: all;
+  }
+
+  .dir-btn {
+    background: rgba(20, 40, 20, 0.8);
+    border: 1px solid #4caf50;
+    color: #d8f5d8;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background 0.15s ease;
+  }
+
+  .dir-btn:hover {
+    background: rgba(76, 175, 80, 0.4);
+  }
+
+  .dir-btn:disabled {
+    opacity: 0.25;
+    cursor: default;
+  }
+
+  .dir-btn:disabled:hover {
+    background: rgba(20, 40, 20, 0.8);
+  }
+
+  #command-form {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+    pointer-events: all;
+  }
+
+  #command-input {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid #4caf50;
+    color: #d8f5d8;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: 3px;
+    width: 220px;
+  }
+
+  #command-input:focus {
+    outline: none;
+    box-shadow: 0 0 6px rgba(76, 175, 80, 0.6);
+  }
+
+  #command-submit {
+    background: rgba(20, 40, 20, 0.8);
+    border: 1px solid #4caf50;
+    color: #d8f5d8;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+
+  #command-submit:hover {
+    background: rgba(76, 175, 80, 0.4);
+  }
+</style>
+</head>
+<body>
+
+<div id="scene-container"></div>
+
+<div id="ui-overlay">
+  <h1 id="room-name">-</h1>
+  <p id="room-text">Loading...</p>
+  <div id="controls-row">
+    <button class="dir-btn" data-dir="north">North</button>
+    <button class="dir-btn" data-dir="south">South</button>
+    <button class="dir-btn" data-dir="east">East</button>
+    <button class="dir-btn" data-dir="west">West</button>
+    <button class="dir-btn" data-dir="up">Up</button>
+    <button class="dir-btn" data-dir="down">Down</button>
+    <form id="command-form">
+      <input id="command-input" type="text" placeholder="type a command..." autocomplete="off">
+      <button id="command-submit" type="submit">Go</button>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+/* =========================================================================
+   1. GAME STATE
+   ========================================================================= */
+const gameState = {
+  current_room: 'west_of_house',
+  inventory: [],
+  flags: {
+    mailbox_open: false,
+    trapdoor_locked: true
+  }
+};
+
+/* =========================================================================
+   THREE.JS CORE SETUP
+   ========================================================================= */
+const container = document.getElementById('scene-container');
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+scene.fog = new THREE.Fog(0x87ceeb, 20, 60);
+
+const camera = new THREE.PerspectiveCamera(
+  60,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+camera.position.set(0, 4, 10);
+camera.lookAt(0, 1, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+container.appendChild(renderer.domElement);
+
+// Lighting shared across all rooms
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444422, 1.0);
+scene.add(hemiLight);
+
+const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
+sunLight.position.set(8, 12, 6);
+scene.add(sunLight);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* =========================================================================
+   2. ROOM DATA DICTIONARY
+   ========================================================================= */
+const rooms = {
+
+  west_of_house: {
+    id: 'west_of_house',
+    name: 'West of House',
+    text: "You are standing in an open field west of a white house, with a boarded front door. There is a small mailbox here.",
+    exits: {
+      north: 'north_of_house',
+      east: null // front door is boarded - blocked for now
+    },
+    render3D: function(sceneRef) {
+      const group = new THREE.Group();
+
+      // Ground - green field
+      const groundGeo = new THREE.PlaneGeometry(40, 40);
+      const groundMat = new THREE.MeshStandardMaterial({ color: 0x3c8f3c });
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.rotation.x = -Math.PI / 2;
+      group.add(ground);
+
+      // House - white block
+      const houseGeo = new THREE.BoxGeometry(6, 4, 5);
+      const houseMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+      const house = new THREE.Mesh(houseGeo, houseMat);
+      house.position.set(0, 2, -6);
+      group.add(house);
+
+      // Roof - simple low-poly cone
+      const roofGeo = new THREE.ConeGeometry(4.5, 2, 4);
+      const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b4a3c });
+      const roof = new THREE.Mesh(roofGeo, roofMat);
+      roof.rotation.y = Math.PI / 4;
+      roof.position.set(0, 5, -6);
+      group.add(roof);
+
+      // Mailbox - tiny red box
+      const mailboxGeo = new THREE.BoxGeometry(0.4, 0.5, 0.3);
+      const mailboxMat = new THREE.MeshStandardMaterial({ color: 0xaa2222 });
+      const mailbox = new THREE.Mesh(mailboxGeo, mailboxMat);
+      mailbox.position.set(2, 0.5, -1);
+      group.add(mailbox);
+
+      // Mailbox post
+      const postGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.6, 6);
+      const postMat = new THREE.MeshStandardMaterial({ color: 0x5a3a2a });
+      const post = new THREE.Mesh(postGeo, postMat);
+      post.position.set(2, 0.15, -1);
+      group.add(post);
+
+      sceneRef.add(group);
+      return group;
+    },
+    // Where the camera settles when entering this room
+    cameraPosition: new THREE.Vector3(0, 4, 10),
+    cameraLookAt: new THREE.Vector3(0, 1, -3)
+  },
+
+  north_of_house: {
+    id: 'north_of_house',
+    name: 'North of House',
+    text: "You are facing the north side of a white house. There is no door here, and all the windows are boarded up. To the north a narrow path winds through the trees.",
+    exits: {
+      south: 'west_of_house'
+    },
+    render3D: function(sceneRef) {
+      const group = new THREE.Group();
+
+      // Ground - slightly darker, path-worn field
+      const groundGeo = new THREE.PlaneGeometry(40, 40);
+      const groundMat = new THREE.MeshStandardMaterial({ color: 0x357a35 });
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.rotation.x = -Math.PI / 2;
+      group.add(ground);
+
+      // House - same white block, seen from the other side
+      const houseGeo = new THREE.BoxGeometry(6, 4, 5);
+      const houseMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+      const house = new THREE.Mesh(houseGeo, houseMat);
+      house.position.set(0, 2, -6);
+      group.add(house);
+
+      const roofGeo = new THREE.ConeGeometry(4.5, 2, 4);
+      const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b4a3c });
+      const roof = new THREE.Mesh(roofGeo, roofMat);
+      roof.rotation.y = Math.PI / 4;
+      roof.position.set(0, 5, -6);
+      group.add(roof);
+
+      // A couple of low-poly trees to suggest the forest path north
+      function makeTree(x, z) {
+        const t = new THREE.Group();
+        const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 1.2, 6);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3a2a });
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.y = 0.6;
+        t.add(trunk);
+
+        const topGeo = new THREE.ConeGeometry(0.8, 1.8, 6);
+        const topMat = new THREE.MeshStandardMaterial({ color: 0x2e6b2e });
+        const top = new THREE.Mesh(topGeo, topMat);
+        top.position.y = 1.7;
+        t.add(top);
+
+        t.position.set(x, 0, z);
+        return t;
+      }
+
+      group.add(makeTree(-4, -3));
+      group.add(makeTree(4.5, -2));
+      group.add(makeTree(-3, 2));
+
+      sceneRef.add(group);
+      return group;
+    },
+    cameraPosition: new THREE.Vector3(0, 4, 6),
+    cameraLookAt: new THREE.Vector3(0, 1, -6)
+  }
+
+};
+
+/* =========================================================================
+   3. TRANSITION ENGINE
+   ========================================================================= */
+let currentRoomGroup = null;
+let cameraAnimHandle = null;
+
+function clearCurrentRoom() {
+  if (currentRoomGroup) {
+    scene.remove(currentRoomGroup);
+    currentRoomGroup.traverse((obj) => {
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) {
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach((m) => m.dispose());
+        } else {
+          obj.material.dispose();
+        }
+      }
+    });
+    currentRoomGroup = null;
+  }
+}
+
+function animateCameraTo(targetPos, targetLookAt, duration = 900) {
+  if (cameraAnimHandle) cancelAnimationFrame(cameraAnimHandle);
+
+  const startPos = camera.position.clone();
+  // Reuse whatever the camera was last looking at as the animation start
+  const startLookAt = camera.userData.lookAt ? camera.userData.lookAt.clone() : targetLookAt.clone();
+  const startTime = performance.now();
+
+  function easeInOutQuad(t) {
+    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  }
+
+  function step(now) {
+    const t = Math.min((now - startTime) / duration, 1);
+    const eased = easeInOutQuad(t);
+
+    camera.position.lerpVectors(startPos, targetPos, eased);
+    const lookAt = new THREE.Vector3().lerpVectors(startLookAt, targetLookAt, eased);
+    camera.lookAt(lookAt);
+    camera.userData.lookAt = lookAt;
+
+    if (t < 1) {
+      cameraAnimHandle = requestAnimationFrame(step);
+    }
+  }
+
+  cameraAnimHandle = requestAnimationFrame(step);
+}
+
+function printRoomText(room) {
+  document.getElementById('room-name').textContent = room.name;
+  document.getElementById('room-text').textContent = room.text;
+}
+
+function updateDirButtons(room) {
+  document.querySelectorAll('.dir-btn').forEach((btn) => {
+    const dir = btn.getAttribute('data-dir');
+    const target = room.exits[dir];
+    btn.disabled = !target;
+  });
+}
+
+function goToRoom(roomId) {
+  const room = rooms[roomId];
+  if (!room) {
+    console.warn('Unknown room:', roomId);
+    return;
+  }
+
+  clearCurrentRoom();
+  currentRoomGroup = room.render3D(scene);
+
+  gameState.current_room = room.id;
+
+  animateCameraTo(room.cameraPosition, room.cameraLookAt);
+  printRoomText(room);
+  updateDirButtons(room);
+}
+
+function tryMove(direction) {
+  const room = rooms[gameState.current_room];
+  const targetId = room.exits[direction];
+  if (targetId) {
+    goToRoom(targetId);
+  } else {
+    document.getElementById('room-text').textContent =
+      "You can't go that way.";
+  }
+}
+
+/* =========================================================================
+   INPUT HANDLING
+   ========================================================================= */
+document.querySelectorAll('.dir-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    tryMove(btn.getAttribute('data-dir'));
+  });
+});
+
+document.getElementById('command-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const input = document.getElementById('command-input');
+  const cmd = input.value.trim().toLowerCase();
+  input.value = '';
+
+  const directionAliases = {
+    n: 'north', north: 'north',
+    s: 'south', south: 'south',
+    e: 'east', east: 'east',
+    w: 'west', west: 'west',
+    u: 'up', up: 'up',
+    d: 'down', down: 'down'
+  };
+
+  if (directionAliases[cmd]) {
+    tryMove(directionAliases[cmd]);
+  } else if (cmd === 'look') {
+    printRoomText(rooms[gameState.current_room]);
+  } else {
+    document.getElementById('room-text').textContent =
+      "I don't understand that command.";
+  }
+});
+
+// Also allow raw arrow-key / WASD movement for convenience
+window.addEventListener('keydown', (e) => {
+  const keyMap = {
+    ArrowUp: 'north', w: 'north', W: 'north',
+    ArrowDown: 'south', s: 'south', S: 'south',
+    ArrowRight: 'east', d: 'east', D: 'east',
+    ArrowLeft: 'west', a: 'west', A: 'west'
+  };
+  const active = document.activeElement;
+  const typingInInput = active && active.id === 'command-input';
+  if (!typingInInput && keyMap[e.key]) {
+    tryMove(keyMap[e.key]);
+  }
+});
+
+/* =========================================================================
+   RENDER LOOP
+   ========================================================================= */
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+
+goToRoom(gameState.current_room);
+animate();
+
+</script>
+</body>
+</html>
