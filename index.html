@@ -150,6 +150,7 @@
 const gameState = {
   current_room: 'west_of_house',
   inventory: [],
+  has_lamp_lit: false,
   flags: {
     mailbox_open: false,
     trapdoor_locked: true
@@ -161,9 +162,11 @@ const gameState = {
    ========================================================================= */
 const container = document.getElementById('scene-container');
 
+const SKY_COLOR = 0x87ceeb;
+
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87ceeb);
-scene.fog = new THREE.Fog(0x87ceeb, 20, 60);
+scene.background = new THREE.Color(SKY_COLOR);
+scene.fog = new THREE.Fog(SKY_COLOR, 20, 60);
 
 const camera = new THREE.PerspectiveCamera(
   60,
@@ -204,7 +207,8 @@ const rooms = {
     text: "You are standing in an open field west of a white house, with a boarded front door. There is a small mailbox here.",
     exits: {
       north: 'north_of_house',
-      east: null // front door is boarded - blocked for now
+      east: null, // front door is boarded - blocked for now
+      down: 'cellar'
     },
     render3D: function(sceneRef) {
       const group = new THREE.Group();
@@ -312,6 +316,44 @@ const rooms = {
     },
     cameraPosition: new THREE.Vector3(0, 4, 6),
     cameraLookAt: new THREE.Vector3(0, 1, -6)
+  },
+
+  cellar: {
+    id: 'cellar',
+    name: 'Cellar',
+    text: "You are in a dark and musty cellar. A dirt floor and rough stone walls surround you. A passage leads up.",
+    dark: true,
+    exits: {
+      up: 'west_of_house'
+    },
+    render3D: function(sceneRef) {
+      const group = new THREE.Group();
+
+      const floorGeo = new THREE.PlaneGeometry(10, 10);
+      const floorMat = new THREE.MeshStandardMaterial({ color: 0x4a3f30 });
+      const floor = new THREE.Mesh(floorGeo, floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      group.add(floor);
+
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0x555550 });
+      const backWall = new THREE.Mesh(new THREE.BoxGeometry(10, 3, 0.3), wallMat);
+      backWall.position.set(0, 1.5, -5);
+      group.add(backWall);
+
+      const sideWallGeo = new THREE.BoxGeometry(0.3, 3, 10);
+      const leftWall = new THREE.Mesh(sideWallGeo, wallMat);
+      leftWall.position.set(-5, 1.5, 0);
+      group.add(leftWall);
+
+      const rightWall = new THREE.Mesh(sideWallGeo, wallMat);
+      rightWall.position.set(5, 1.5, 0);
+      group.add(rightWall);
+
+      sceneRef.add(group);
+      return group;
+    },
+    cameraPosition: new THREE.Vector3(0, 2, 3),
+    cameraLookAt: new THREE.Vector3(0, 1, -5)
   }
 
 };
@@ -368,16 +410,33 @@ function animateCameraTo(targetPos, targetLookAt, duration = 900) {
   cameraAnimHandle = requestAnimationFrame(step);
 }
 
-function printRoomText(room) {
-  document.getElementById('room-name').textContent = room.name;
-  document.getElementById('room-text').textContent = room.text;
+function isRoomDark(room) {
+  return !!room.dark && !gameState.has_lamp_lit;
 }
 
-function updateDirButtons(room) {
+// Applies lighting + text + exit buttons for the current room. Called on
+// room entry, and again whenever the lamp is toggled without moving.
+function applyRoomState() {
+  const room = rooms[gameState.current_room];
+  const dark = isRoomDark(room);
+
+  hemiLight.visible = !dark;
+  sunLight.visible = !dark;
+  scene.background.set(dark ? 0x000000 : SKY_COLOR);
+  scene.fog.color.set(dark ? 0x000000 : SKY_COLOR);
+
+  if (dark) {
+    document.getElementById('room-name').textContent = 'Pitch Black';
+    document.getElementById('room-text').textContent =
+      "It is pitch black. You are likely to be eaten by a grue.";
+  } else {
+    document.getElementById('room-name').textContent = room.name;
+    document.getElementById('room-text').textContent = room.text;
+  }
+
   document.querySelectorAll('.dir-btn').forEach((btn) => {
     const dir = btn.getAttribute('data-dir');
-    const target = room.exits[dir];
-    btn.disabled = !target;
+    btn.disabled = !room.exits[dir];
   });
 }
 
@@ -394,8 +453,12 @@ function goToRoom(roomId) {
   gameState.current_room = room.id;
 
   animateCameraTo(room.cameraPosition, room.cameraLookAt);
-  printRoomText(room);
-  updateDirButtons(room);
+  applyRoomState();
+}
+
+function setLampLit(lit) {
+  gameState.has_lamp_lit = lit;
+  applyRoomState();
 }
 
 function tryMove(direction) {
@@ -433,10 +496,17 @@ document.getElementById('command-form').addEventListener('submit', (e) => {
     d: 'down', down: 'down'
   };
 
+  const lampOnCommands = ['light lamp', 'turn on lamp', 'light the lamp'];
+  const lampOffCommands = ['turn off lamp', 'extinguish lamp', 'douse lamp'];
+
   if (directionAliases[cmd]) {
     tryMove(directionAliases[cmd]);
   } else if (cmd === 'look') {
-    printRoomText(rooms[gameState.current_room]);
+    applyRoomState();
+  } else if (lampOnCommands.includes(cmd)) {
+    setLampLit(true);
+  } else if (lampOffCommands.includes(cmd)) {
+    setLampLit(false);
   } else {
     document.getElementById('room-text').textContent =
       "I don't understand that command.";
