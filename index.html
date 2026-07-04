@@ -226,11 +226,17 @@ const rooms = {
   west_of_house: {
     id: 'west_of_house',
     name: 'West of House',
-    text: "You are standing in an open field west of a white house, with a boarded front door. There is a small mailbox here.",
+    text: "You are standing in an open field west of a white house, with a boarded front door. There is a small mailbox here, and a wooden trapdoor is set into the ground nearby.",
     exits: {
       north: 'north_of_house',
       east: null, // front door is boarded - blocked for now
       down: 'cellar'
+    },
+    // Movement guards: run before an exit is taken. Returning a string
+    // blocks the move and shows that message instead; returning null/undefined
+    // lets it through.
+    exitGuards: {
+      down: () => (gameState.flags.trapdoor_locked ? "The trapdoor is closed." : null)
     },
     // Built as a stage set around the fixed camera at (0,0,0): the ground
     // sits EYE_HEIGHT below the player, everything else stacks up from there.
@@ -295,6 +301,19 @@ const rooms = {
         leafletMesh.position.set(2, groundY + 0.8, -3);
         group.add(leafletMesh);
       }
+
+      // Trapdoor - flush with the ground when closed, propped open on end
+      // when unlocked, revealing the passage down into the cellar.
+      const trapdoorGeo = new THREE.BoxGeometry(1.2, 0.1, 1.2);
+      const trapdoorMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2f });
+      const trapdoor = new THREE.Mesh(trapdoorGeo, trapdoorMat);
+      if (gameState.flags.trapdoor_locked) {
+        trapdoor.position.set(-2, groundY + 0.05, -4);
+      } else {
+        trapdoor.rotation.z = Math.PI / 2.3;
+        trapdoor.position.set(-2.5, groundY + 0.6, -4);
+      }
+      group.add(trapdoor);
 
       sceneRef.add(group);
       return group;
@@ -500,11 +519,19 @@ function setLampLit(lit) {
 function tryMove(direction) {
   const room = rooms[gameState.current_room];
   const targetId = room.exits[direction];
-  if (targetId) {
-    goToRoom(targetId);
-  } else {
+  if (!targetId) {
     setMessage("You can't go that way.");
+    return;
   }
+
+  const guard = room.exitGuards && room.exitGuards[direction];
+  const blockedMessage = guard && guard();
+  if (blockedMessage) {
+    setMessage(blockedMessage);
+    return;
+  }
+
+  goToRoom(targetId);
 }
 
 /* =========================================================================
@@ -547,6 +574,18 @@ function handleOpen(noun) {
     }
     return;
   }
+  if (noun === 'trapdoor') {
+    if (gameState.current_room !== 'west_of_house') {
+      setMessage("You don't see a trapdoor here.");
+    } else if (!gameState.flags.trapdoor_locked) {
+      setMessage("It is already open.");
+    } else {
+      gameState.flags.trapdoor_locked = false;
+      rebuildCurrentRoomVisuals();
+      setMessage("You heave the trapdoor open, revealing a passage down into darkness.");
+    }
+    return;
+  }
   setMessage("You can't open that.");
 }
 
@@ -560,6 +599,18 @@ function handleClose(noun) {
       gameState.flags.mailbox_open = false;
       rebuildCurrentRoomVisuals();
       setMessage("Closed.");
+    }
+    return;
+  }
+  if (noun === 'trapdoor') {
+    if (gameState.current_room !== 'west_of_house') {
+      setMessage("You don't see a trapdoor here.");
+    } else if (gameState.flags.trapdoor_locked) {
+      setMessage("It is already closed.");
+    } else {
+      gameState.flags.trapdoor_locked = true;
+      rebuildCurrentRoomVisuals();
+      setMessage("You lower the trapdoor closed.");
     }
     return;
   }
@@ -604,6 +655,16 @@ function handleExamine(noun) {
       setMessage("You don't see a mailbox here.");
     } else {
       setMessage(describeMailbox());
+    }
+    return;
+  }
+  if (noun === 'trapdoor') {
+    if (gameState.current_room !== 'west_of_house') {
+      setMessage("You don't see a trapdoor here.");
+    } else {
+      setMessage(gameState.flags.trapdoor_locked
+        ? "A closed wooden trapdoor is set into the ground."
+        : "The open trapdoor reveals a passage leading down into darkness.");
     }
     return;
   }
@@ -671,6 +732,14 @@ document.getElementById('command-form').addEventListener('submit', (e) => {
   }
   if (cmd === 'inventory' || cmd === 'i' || cmd === 'inv') {
     handleInventory();
+    return;
+  }
+  if (cmd === 'help') {
+    setMessage(
+      "Commands: north/south/east/west/up/down (or n/s/e/w/u/d), look, " +
+      "examine <thing>, open/close <thing>, take/drop <thing>, read <thing>, " +
+      "inventory, light lamp / turn off lamp."
+    );
     return;
   }
   if (lampOnCommands.includes(cmd)) {
