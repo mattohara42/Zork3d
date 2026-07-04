@@ -47,6 +47,7 @@
     line-height: 1.4;
     max-width: 800px;
     color: #d8f5d8;
+    white-space: pre-line;
   }
 
   #controls-row {
@@ -158,6 +159,23 @@ const gameState = {
 };
 
 /* =========================================================================
+   ITEM DATA DICTIONARY
+   `location` is one of: a room id (dropped on the floor there), 'mailbox'
+   (sitting inside the mailbox, only reachable while it's open), or
+   'inventory' (carried by the player).
+   ========================================================================= */
+const items = {
+  leaflet: {
+    id: 'leaflet',
+    name: 'leaflet',
+    description: "A small paper leaflet.",
+    readText: "\"WELCOME TO ZORK!\n\nZORK is a game of adventure, danger, and low cunning. In it you will explore some of the most amazing territory ever seen by mortals. No computer should be without one!\"",
+    portable: true,
+    location: 'mailbox'
+  }
+};
+
+/* =========================================================================
    THREE.JS CORE SETUP
    ========================================================================= */
 const container = document.getElementById('scene-container');
@@ -256,6 +274,27 @@ const rooms = {
       const post = new THREE.Mesh(postGeo, postMat);
       post.position.set(2, groundY + 0.3, -3);
       group.add(post);
+
+      // Mailbox lid - flat when closed, flipped up against the back when open
+      const lidGeo = new THREE.BoxGeometry(0.4, 0.05, 0.3);
+      const lidMat = new THREE.MeshStandardMaterial({ color: 0x8b1f1f });
+      const lid = new THREE.Mesh(lidGeo, lidMat);
+      if (gameState.flags.mailbox_open) {
+        lid.position.set(2, groundY + 1.15, -3.13);
+        lid.rotation.x = Math.PI / 2.2;
+      } else {
+        lid.position.set(2, groundY + 1.13, -3);
+      }
+      group.add(lid);
+
+      // Leaflet - only visible poking out once the mailbox is open
+      if (gameState.flags.mailbox_open && items.leaflet.location === 'mailbox') {
+        const leafletGeo = new THREE.BoxGeometry(0.25, 0.02, 0.18);
+        const leafletMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        const leafletMesh = new THREE.Mesh(leafletGeo, leafletMat);
+        leafletMesh.position.set(2, groundY + 0.8, -3);
+        group.add(leafletMesh);
+      }
 
       sceneRef.add(group);
       return group;
@@ -394,6 +433,10 @@ function resetCameraToOrigin() {
   camera.lookAt(0, 0, -1);
 }
 
+function setMessage(text) {
+  document.getElementById('room-text').textContent = text;
+}
+
 function isRoomDark(room) {
   return !!room.dark && !gameState.has_lamp_lit;
 }
@@ -411,17 +454,26 @@ function applyRoomState() {
 
   if (dark) {
     document.getElementById('room-name').textContent = 'Pitch Black';
-    document.getElementById('room-text').textContent =
-      "It is pitch black. You are likely to be eaten by a grue.";
+    setMessage("It is pitch black. You are likely to be eaten by a grue.");
   } else {
     document.getElementById('room-name').textContent = room.name;
-    document.getElementById('room-text').textContent = room.text;
+    setMessage(room.text);
   }
 
   document.querySelectorAll('.dir-btn').forEach((btn) => {
     const dir = btn.getAttribute('data-dir');
     btn.disabled = !room.exits[dir];
   });
+}
+
+// Rebuilds the current room's meshes in place, without touching the room
+// text - used when an interaction (opening the mailbox, taking an item)
+// changes what a room looks like but doesn't move the player.
+function rebuildCurrentRoomVisuals() {
+  const room = rooms[gameState.current_room];
+  clearCurrentRoom();
+  resetCameraToOrigin();
+  currentRoomGroup = room.render3D(scene);
 }
 
 function goToRoom(roomId) {
@@ -451,9 +503,134 @@ function tryMove(direction) {
   if (targetId) {
     goToRoom(targetId);
   } else {
-    document.getElementById('room-text').textContent =
-      "You can't go that way.";
+    setMessage("You can't go that way.");
   }
+}
+
+/* =========================================================================
+   ITEM / CONTAINER INTERACTIONS
+   ========================================================================= */
+function findItemByName(name) {
+  return Object.values(items).find((item) => item.name === name);
+}
+
+// Is this item somewhere the player can currently reach (room floor, an
+// open container in this room, or already in hand)?
+function isItemReachable(item) {
+  if (item.location === 'inventory') return true;
+  if (item.location === gameState.current_room) return true;
+  if (item.location === 'mailbox') {
+    return gameState.current_room === 'west_of_house' && gameState.flags.mailbox_open;
+  }
+  return false;
+}
+
+function describeMailbox() {
+  if (!gameState.flags.mailbox_open) {
+    return "The small mailbox is closed.";
+  }
+  return items.leaflet.location === 'mailbox'
+    ? "The small mailbox is open. Inside is a leaflet."
+    : "The small mailbox is open and empty.";
+}
+
+function handleOpen(noun) {
+  if (noun === 'mailbox') {
+    if (gameState.current_room !== 'west_of_house') {
+      setMessage("You don't see a mailbox here.");
+    } else if (gameState.flags.mailbox_open) {
+      setMessage("It is already open.");
+    } else {
+      gameState.flags.mailbox_open = true;
+      rebuildCurrentRoomVisuals();
+      setMessage("Opening the small mailbox reveals a leaflet.");
+    }
+    return;
+  }
+  setMessage("You can't open that.");
+}
+
+function handleClose(noun) {
+  if (noun === 'mailbox') {
+    if (gameState.current_room !== 'west_of_house') {
+      setMessage("You don't see a mailbox here.");
+    } else if (!gameState.flags.mailbox_open) {
+      setMessage("It is already closed.");
+    } else {
+      gameState.flags.mailbox_open = false;
+      rebuildCurrentRoomVisuals();
+      setMessage("Closed.");
+    }
+    return;
+  }
+  setMessage("You can't close that.");
+}
+
+function handleTake(noun) {
+  const item = findItemByName(noun);
+  if (!item || !isItemReachable(item)) {
+    setMessage("You can't see that here.");
+    return;
+  }
+  if (item.location === 'inventory') {
+    setMessage("You already have that.");
+    return;
+  }
+  if (!item.portable) {
+    setMessage("You can't take that.");
+    return;
+  }
+  item.location = 'inventory';
+  gameState.inventory.push(item.id);
+  rebuildCurrentRoomVisuals();
+  setMessage("Taken.");
+}
+
+function handleDrop(noun) {
+  const item = findItemByName(noun);
+  if (!item || item.location !== 'inventory') {
+    setMessage("You're not carrying that.");
+    return;
+  }
+  item.location = gameState.current_room;
+  gameState.inventory = gameState.inventory.filter((id) => id !== item.id);
+  rebuildCurrentRoomVisuals();
+  setMessage("Dropped.");
+}
+
+function handleExamine(noun) {
+  if (noun === 'mailbox') {
+    if (gameState.current_room !== 'west_of_house') {
+      setMessage("You don't see a mailbox here.");
+    } else {
+      setMessage(describeMailbox());
+    }
+    return;
+  }
+  const item = findItemByName(noun);
+  if (item && isItemReachable(item)) {
+    setMessage(item.description);
+    return;
+  }
+  setMessage("You don't see that here.");
+}
+
+function handleRead(noun) {
+  const item = findItemByName(noun);
+  if (!item || !isItemReachable(item)) {
+    setMessage("You don't see that here.");
+    return;
+  }
+  setMessage(item.readText || "There's nothing written on it.");
+}
+
+function handleInventory() {
+  if (gameState.inventory.length === 0) {
+    setMessage("You are empty-handed.");
+    return;
+  }
+  const names = gameState.inventory.map((id) => items[id].name).join(', ');
+  setMessage(`You are carrying: ${names}.`);
 }
 
 /* =========================================================================
@@ -470,6 +647,7 @@ document.getElementById('command-form').addEventListener('submit', (e) => {
   const input = document.getElementById('command-input');
   const cmd = input.value.trim().toLowerCase();
   input.value = '';
+  if (!cmd) return;
 
   const directionAliases = {
     n: 'north', north: 'north',
@@ -485,15 +663,54 @@ document.getElementById('command-form').addEventListener('submit', (e) => {
 
   if (directionAliases[cmd]) {
     tryMove(directionAliases[cmd]);
-  } else if (cmd === 'look') {
+    return;
+  }
+  if (cmd === 'look') {
     applyRoomState();
-  } else if (lampOnCommands.includes(cmd)) {
+    return;
+  }
+  if (cmd === 'inventory' || cmd === 'i' || cmd === 'inv') {
+    handleInventory();
+    return;
+  }
+  if (lampOnCommands.includes(cmd)) {
     setLampLit(true);
-  } else if (lampOffCommands.includes(cmd)) {
+    return;
+  }
+  if (lampOffCommands.includes(cmd)) {
     setLampLit(false);
-  } else {
-    document.getElementById('room-text').textContent =
-      "I don't understand that command.";
+    return;
+  }
+
+  const words = cmd.split(/\s+/);
+  const verb = words[0];
+  const skipAt = verb === 'look' && words[1] === 'at' ? 2 : 1;
+  const noun = words.slice(skipAt).join(' ').replace(/^the\s+/, '').trim();
+
+  switch (verb) {
+    case 'open':
+      handleOpen(noun);
+      break;
+    case 'close':
+      handleClose(noun);
+      break;
+    case 'take':
+    case 'get':
+      handleTake(noun);
+      break;
+    case 'drop':
+      handleDrop(noun);
+      break;
+    case 'examine':
+    case 'x':
+    case 'look':
+      handleExamine(noun);
+      break;
+    case 'read':
+      handleRead(noun);
+      break;
+    default:
+      setMessage("I don't understand that command.");
   }
 });
 
