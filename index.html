@@ -154,7 +154,8 @@ const gameState = {
   has_lamp_lit: false,
   flags: {
     mailbox_open: false,
-    trapdoor_locked: true
+    trapdoor_locked: true,
+    window_open: false
   }
 };
 
@@ -218,6 +219,26 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+// The white house's box + roof are identical from every exterior room
+// (only the ground color and props differ), so each room's render3D()
+// shares this instead of re-declaring the same meshes.
+function addHouseShell(group, groundY) {
+  const houseGeo = new THREE.BoxGeometry(6, 4, 5);
+  const houseMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+  const house = new THREE.Mesh(houseGeo, houseMat);
+  house.position.set(0, groundY + 2, -10);
+  group.add(house);
+
+  const roofGeo = new THREE.ConeGeometry(4.5, 2, 4);
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b4a3c });
+  const roof = new THREE.Mesh(roofGeo, roofMat);
+  roof.rotation.y = Math.PI / 4;
+  roof.position.set(0, groundY + 5, -10);
+  group.add(roof);
+
+  return house;
+}
+
 /* =========================================================================
    2. ROOM DATA DICTIONARY
    ========================================================================= */
@@ -229,6 +250,7 @@ const rooms = {
     text: "You are standing in an open field west of a white house, with a boarded front door. There is a small mailbox here, and a wooden trapdoor is set into the ground nearby.",
     exits: {
       north: 'north_of_house',
+      south: 'south_of_house',
       east: null, // front door is boarded - blocked for now
       down: 'cellar'
     },
@@ -252,20 +274,7 @@ const rooms = {
       ground.position.y = groundY;
       group.add(ground);
 
-      // House - white block, resting on the ground, 10 units ahead
-      const houseGeo = new THREE.BoxGeometry(6, 4, 5);
-      const houseMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-      const house = new THREE.Mesh(houseGeo, houseMat);
-      house.position.set(0, groundY + 2, -10);
-      group.add(house);
-
-      // Roof - simple low-poly cone
-      const roofGeo = new THREE.ConeGeometry(4.5, 2, 4);
-      const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b4a3c });
-      const roof = new THREE.Mesh(roofGeo, roofMat);
-      roof.rotation.y = Math.PI / 4;
-      roof.position.set(0, groundY + 5, -10);
-      group.add(roof);
+      addHouseShell(group, groundY);
 
       // Mailbox - tiny red box just off to the side, near the player
       const mailboxGeo = new THREE.BoxGeometry(0.4, 0.5, 0.3);
@@ -325,7 +334,8 @@ const rooms = {
     name: 'North of House',
     text: "You are facing the north side of a white house. There is no door here, and all the windows are boarded up. To the north a narrow path winds through the trees.",
     exits: {
-      south: 'west_of_house'
+      south: 'west_of_house',
+      east: 'behind_house'
     },
     render3D: function(sceneRef) {
       const group = new THREE.Group();
@@ -339,19 +349,7 @@ const rooms = {
       ground.position.y = groundY;
       group.add(ground);
 
-      // House - same white block, seen from the other side
-      const houseGeo = new THREE.BoxGeometry(6, 4, 5);
-      const houseMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-      const house = new THREE.Mesh(houseGeo, houseMat);
-      house.position.set(0, groundY + 2, -10);
-      group.add(house);
-
-      const roofGeo = new THREE.ConeGeometry(4.5, 2, 4);
-      const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b4a3c });
-      const roof = new THREE.Mesh(roofGeo, roofMat);
-      roof.rotation.y = Math.PI / 4;
-      roof.position.set(0, groundY + 5, -10);
-      group.add(roof);
+      addHouseShell(group, groundY);
 
       // A couple of low-poly trees to suggest the forest path north
       function makeTree(x, z) {
@@ -375,6 +373,125 @@ const rooms = {
       group.add(makeTree(-4, -6));
       group.add(makeTree(4.5, -5));
       group.add(makeTree(-3, -2));
+
+      sceneRef.add(group);
+      return group;
+    }
+  },
+
+  south_of_house: {
+    id: 'south_of_house',
+    name: 'South of House',
+    text: "You are facing the south side of a white house. All the windows on this side are boarded. A path wraps around the house in both directions.",
+    exits: {
+      north: 'west_of_house',
+      east: 'behind_house'
+    },
+    render3D: function(sceneRef) {
+      const group = new THREE.Group();
+      const groundY = -EYE_HEIGHT;
+
+      const groundGeo = new THREE.PlaneGeometry(40, 40);
+      const groundMat = new THREE.MeshStandardMaterial({ color: 0x3c8f3c });
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = groundY;
+      group.add(ground);
+
+      addHouseShell(group, groundY);
+
+      sceneRef.add(group);
+      return group;
+    }
+  },
+
+  behind_house: {
+    id: 'behind_house',
+    name: 'Behind House',
+    text: "You are behind the white house. A path leads around the house to the north and south. A window is set into the wall here.",
+    exits: {
+      west: 'north_of_house',
+      south: 'south_of_house',
+      in: 'kitchen'
+    },
+    exitGuards: {
+      in: () => (gameState.flags.window_open ? null : "The window is closed.")
+    },
+    render3D: function(sceneRef) {
+      const group = new THREE.Group();
+      const groundY = -EYE_HEIGHT;
+
+      const groundGeo = new THREE.PlaneGeometry(40, 40);
+      const groundMat = new THREE.MeshStandardMaterial({ color: 0x3c8f3c });
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = groundY;
+      group.add(ground);
+
+      addHouseShell(group, groundY);
+
+      // Window - set into the near face of the house, glassy blue when
+      // closed, a dark opening once it's pried open.
+      const windowGeo = new THREE.PlaneGeometry(1, 1.2);
+      const windowMat = new THREE.MeshStandardMaterial({
+        color: gameState.flags.window_open ? 0x1a1a1a : 0xbfe3f0
+      });
+      const windowMesh = new THREE.Mesh(windowGeo, windowMat);
+      windowMesh.position.set(1.2, groundY + 2.2, -7.49);
+      group.add(windowMesh);
+
+      sceneRef.add(group);
+      return group;
+    }
+  },
+
+  kitchen: {
+    id: 'kitchen',
+    name: 'Kitchen',
+    text: "You are in the kitchen of the white house. A sturdy wooden table stands in the corner. The window behind you leads back outside.",
+    exits: {
+      out: 'behind_house'
+    },
+    render3D: function(sceneRef) {
+      const group = new THREE.Group();
+      const groundY = -EYE_HEIGHT;
+
+      const floorGeo = new THREE.PlaneGeometry(8, 8);
+      const floorMat = new THREE.MeshStandardMaterial({ color: 0xc9a876 });
+      const floor = new THREE.Mesh(floorGeo, floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = groundY;
+      group.add(floor);
+
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0xe8dcc8 });
+      const backWall = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 0.2), wallMat);
+      backWall.position.set(0, groundY + 1.5, -4);
+      group.add(backWall);
+
+      const sideWallGeo = new THREE.BoxGeometry(0.2, 3, 8);
+      const leftWall = new THREE.Mesh(sideWallGeo, wallMat);
+      leftWall.position.set(-4, groundY + 1.5, 0);
+      group.add(leftWall);
+
+      const rightWall = new THREE.Mesh(sideWallGeo, wallMat);
+      rightWall.position.set(4, groundY + 1.5, 0);
+      group.add(rightWall);
+
+      // Table - simple low-poly slab on four legs
+      const tableTop = new THREE.Mesh(
+        new THREE.BoxGeometry(1.4, 0.1, 0.9),
+        new THREE.MeshStandardMaterial({ color: 0x8b5a2b })
+      );
+      tableTop.position.set(-2.5, groundY + 0.8, -2.5);
+      group.add(tableTop);
+
+      const legGeo = new THREE.BoxGeometry(0.1, 0.75, 0.1);
+      const legMat = new THREE.MeshStandardMaterial({ color: 0x6b4423 });
+      [[-3.05, -2.9], [-1.95, -2.9], [-3.05, -2.1], [-1.95, -2.1]].forEach(([x, z]) => {
+        const leg = new THREE.Mesh(legGeo, legMat);
+        leg.position.set(x, groundY + 0.375, z);
+        group.add(leg);
+      });
 
       sceneRef.add(group);
       return group;
@@ -586,6 +703,18 @@ function handleOpen(noun) {
     }
     return;
   }
+  if (noun === 'window') {
+    if (gameState.current_room !== 'behind_house') {
+      setMessage("You don't see a window here.");
+    } else if (gameState.flags.window_open) {
+      setMessage("It is already open.");
+    } else {
+      gameState.flags.window_open = true;
+      rebuildCurrentRoomVisuals();
+      setMessage("With some effort, you pry the window open.");
+    }
+    return;
+  }
   setMessage("You can't open that.");
 }
 
@@ -611,6 +740,18 @@ function handleClose(noun) {
       gameState.flags.trapdoor_locked = true;
       rebuildCurrentRoomVisuals();
       setMessage("You lower the trapdoor closed.");
+    }
+    return;
+  }
+  if (noun === 'window') {
+    if (gameState.current_room !== 'behind_house') {
+      setMessage("You don't see a window here.");
+    } else if (!gameState.flags.window_open) {
+      setMessage("It is already closed.");
+    } else {
+      gameState.flags.window_open = false;
+      rebuildCurrentRoomVisuals();
+      setMessage("You close the window.");
     }
     return;
   }
@@ -668,6 +809,24 @@ function handleExamine(noun) {
     }
     return;
   }
+  if (noun === 'window') {
+    if (gameState.current_room !== 'behind_house') {
+      setMessage("You don't see a window here.");
+    } else {
+      setMessage(gameState.flags.window_open
+        ? "The window is open, just wide enough to climb through."
+        : "The window is closed, but it doesn't look locked.");
+    }
+    return;
+  }
+  if (noun === 'table') {
+    if (gameState.current_room !== 'kitchen') {
+      setMessage("You don't see that here.");
+    } else {
+      setMessage("A plain wooden table, empty except for a thin layer of dust.");
+    }
+    return;
+  }
   const item = findItemByName(noun);
   if (item && isItemReachable(item)) {
     setMessage(item.description);
@@ -716,7 +875,9 @@ document.getElementById('command-form').addEventListener('submit', (e) => {
     e: 'east', east: 'east',
     w: 'west', west: 'west',
     u: 'up', up: 'up',
-    d: 'down', down: 'down'
+    d: 'down', down: 'down',
+    in: 'in', enter: 'in',
+    out: 'out', exit: 'out'
   };
 
   const lampOnCommands = ['light lamp', 'turn on lamp', 'light the lamp'];
@@ -736,7 +897,7 @@ document.getElementById('command-form').addEventListener('submit', (e) => {
   }
   if (cmd === 'help') {
     setMessage(
-      "Commands: north/south/east/west/up/down (or n/s/e/w/u/d), look, " +
+      "Commands: north/south/east/west/up/down/in/out (or n/s/e/w/u/d), look, " +
       "examine <thing>, open/close <thing>, take/drop <thing>, read <thing>, " +
       "inventory, light lamp / turn off lamp."
     );
@@ -757,6 +918,12 @@ document.getElementById('command-form').addEventListener('submit', (e) => {
   const noun = words.slice(skipAt).join(' ').replace(/^the\s+/, '').trim();
 
   switch (verb) {
+    case 'enter':
+      tryMove('in');
+      break;
+    case 'leave':
+      tryMove('out');
+      break;
     case 'open':
       handleOpen(noun);
       break;
