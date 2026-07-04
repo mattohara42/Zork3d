@@ -164,6 +164,12 @@ const container = document.getElementById('scene-container');
 
 const SKY_COLOR = 0x87ceeb;
 
+// Height of the player's eyes above whatever ground a room builds beneath
+// them. Every room is authored as a stage set around the fixed camera at
+// the origin, so this is the one shared constant that keeps floors,
+// buildings, etc. lining up with the camera from room to room.
+const EYE_HEIGHT = 1.6;
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(SKY_COLOR);
 scene.fog = new THREE.Fog(SKY_COLOR, 20, 60);
@@ -174,8 +180,6 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000
 );
-camera.position.set(0, 4, 10);
-camera.lookAt(0, 1, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -210,21 +214,25 @@ const rooms = {
       east: null, // front door is boarded - blocked for now
       down: 'cellar'
     },
+    // Built as a stage set around the fixed camera at (0,0,0): the ground
+    // sits EYE_HEIGHT below the player, everything else stacks up from there.
     render3D: function(sceneRef) {
       const group = new THREE.Group();
+      const groundY = -EYE_HEIGHT;
 
       // Ground - green field
       const groundGeo = new THREE.PlaneGeometry(40, 40);
       const groundMat = new THREE.MeshStandardMaterial({ color: 0x3c8f3c });
       const ground = new THREE.Mesh(groundGeo, groundMat);
       ground.rotation.x = -Math.PI / 2;
+      ground.position.y = groundY;
       group.add(ground);
 
-      // House - white block
+      // House - white block, resting on the ground, 10 units ahead
       const houseGeo = new THREE.BoxGeometry(6, 4, 5);
       const houseMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
       const house = new THREE.Mesh(houseGeo, houseMat);
-      house.position.set(0, 2, -6);
+      house.position.set(0, groundY + 2, -10);
       group.add(house);
 
       // Roof - simple low-poly cone
@@ -232,29 +240,26 @@ const rooms = {
       const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b4a3c });
       const roof = new THREE.Mesh(roofGeo, roofMat);
       roof.rotation.y = Math.PI / 4;
-      roof.position.set(0, 5, -6);
+      roof.position.set(0, groundY + 5, -10);
       group.add(roof);
 
-      // Mailbox - tiny red box
+      // Mailbox - tiny red box just off to the side, near the player
       const mailboxGeo = new THREE.BoxGeometry(0.4, 0.5, 0.3);
       const mailboxMat = new THREE.MeshStandardMaterial({ color: 0xaa2222 });
       const mailbox = new THREE.Mesh(mailboxGeo, mailboxMat);
-      mailbox.position.set(2, 0.5, -1);
+      mailbox.position.set(2, groundY + 0.85, -3);
       group.add(mailbox);
 
       // Mailbox post
       const postGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.6, 6);
       const postMat = new THREE.MeshStandardMaterial({ color: 0x5a3a2a });
       const post = new THREE.Mesh(postGeo, postMat);
-      post.position.set(2, 0.15, -1);
+      post.position.set(2, groundY + 0.3, -3);
       group.add(post);
 
       sceneRef.add(group);
       return group;
-    },
-    // Where the camera settles when entering this room
-    cameraPosition: new THREE.Vector3(0, 4, 10),
-    cameraLookAt: new THREE.Vector3(0, 1, -3)
+    }
   },
 
   north_of_house: {
@@ -266,26 +271,28 @@ const rooms = {
     },
     render3D: function(sceneRef) {
       const group = new THREE.Group();
+      const groundY = -EYE_HEIGHT;
 
       // Ground - slightly darker, path-worn field
       const groundGeo = new THREE.PlaneGeometry(40, 40);
       const groundMat = new THREE.MeshStandardMaterial({ color: 0x357a35 });
       const ground = new THREE.Mesh(groundGeo, groundMat);
       ground.rotation.x = -Math.PI / 2;
+      ground.position.y = groundY;
       group.add(ground);
 
       // House - same white block, seen from the other side
       const houseGeo = new THREE.BoxGeometry(6, 4, 5);
       const houseMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
       const house = new THREE.Mesh(houseGeo, houseMat);
-      house.position.set(0, 2, -6);
+      house.position.set(0, groundY + 2, -10);
       group.add(house);
 
       const roofGeo = new THREE.ConeGeometry(4.5, 2, 4);
       const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b4a3c });
       const roof = new THREE.Mesh(roofGeo, roofMat);
       roof.rotation.y = Math.PI / 4;
-      roof.position.set(0, 5, -6);
+      roof.position.set(0, groundY + 5, -10);
       group.add(roof);
 
       // A couple of low-poly trees to suggest the forest path north
@@ -303,19 +310,17 @@ const rooms = {
         top.position.y = 1.7;
         t.add(top);
 
-        t.position.set(x, 0, z);
+        t.position.set(x, groundY, z);
         return t;
       }
 
-      group.add(makeTree(-4, -3));
-      group.add(makeTree(4.5, -2));
-      group.add(makeTree(-3, 2));
+      group.add(makeTree(-4, -6));
+      group.add(makeTree(4.5, -5));
+      group.add(makeTree(-3, -2));
 
       sceneRef.add(group);
       return group;
-    },
-    cameraPosition: new THREE.Vector3(0, 4, 6),
-    cameraLookAt: new THREE.Vector3(0, 1, -6)
+    }
   },
 
   cellar: {
@@ -328,32 +333,32 @@ const rooms = {
     },
     render3D: function(sceneRef) {
       const group = new THREE.Group();
+      const groundY = -EYE_HEIGHT;
 
       const floorGeo = new THREE.PlaneGeometry(10, 10);
       const floorMat = new THREE.MeshStandardMaterial({ color: 0x4a3f30 });
       const floor = new THREE.Mesh(floorGeo, floorMat);
       floor.rotation.x = -Math.PI / 2;
+      floor.position.y = groundY;
       group.add(floor);
 
       const wallMat = new THREE.MeshStandardMaterial({ color: 0x555550 });
       const backWall = new THREE.Mesh(new THREE.BoxGeometry(10, 3, 0.3), wallMat);
-      backWall.position.set(0, 1.5, -5);
+      backWall.position.set(0, groundY + 1.5, -6);
       group.add(backWall);
 
       const sideWallGeo = new THREE.BoxGeometry(0.3, 3, 10);
       const leftWall = new THREE.Mesh(sideWallGeo, wallMat);
-      leftWall.position.set(-5, 1.5, 0);
+      leftWall.position.set(-5, groundY + 1.5, -1);
       group.add(leftWall);
 
       const rightWall = new THREE.Mesh(sideWallGeo, wallMat);
-      rightWall.position.set(5, 1.5, 0);
+      rightWall.position.set(5, groundY + 1.5, -1);
       group.add(rightWall);
 
       sceneRef.add(group);
       return group;
-    },
-    cameraPosition: new THREE.Vector3(0, 2, 3),
-    cameraLookAt: new THREE.Vector3(0, 1, -5)
+    }
   }
 
 };
@@ -362,7 +367,6 @@ const rooms = {
    3. TRANSITION ENGINE
    ========================================================================= */
 let currentRoomGroup = null;
-let cameraAnimHandle = null;
 
 function clearCurrentRoom() {
   if (currentRoomGroup) {
@@ -381,33 +385,13 @@ function clearCurrentRoom() {
   }
 }
 
-function animateCameraTo(targetPos, targetLookAt, duration = 900) {
-  if (cameraAnimHandle) cancelAnimationFrame(cameraAnimHandle);
-
-  const startPos = camera.position.clone();
-  // Reuse whatever the camera was last looking at as the animation start
-  const startLookAt = camera.userData.lookAt ? camera.userData.lookAt.clone() : targetLookAt.clone();
-  const startTime = performance.now();
-
-  function easeInOutQuad(t) {
-    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-  }
-
-  function step(now) {
-    const t = Math.min((now - startTime) / duration, 1);
-    const eased = easeInOutQuad(t);
-
-    camera.position.lerpVectors(startPos, targetPos, eased);
-    const lookAt = new THREE.Vector3().lerpVectors(startLookAt, targetLookAt, eased);
-    camera.lookAt(lookAt);
-    camera.userData.lookAt = lookAt;
-
-    if (t < 1) {
-      cameraAnimHandle = requestAnimationFrame(step);
-    }
-  }
-
-  cameraAnimHandle = requestAnimationFrame(step);
+// Every room is its own stage: the camera never travels through a shared
+// world, it just snaps back to a fixed neutral seat and the old set is torn
+// down before the new one goes up.
+function resetCameraToOrigin() {
+  camera.position.set(0, 0, 0);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(0, 0, -1);
 }
 
 function isRoomDark(room) {
@@ -448,11 +432,11 @@ function goToRoom(roomId) {
   }
 
   clearCurrentRoom();
+  resetCameraToOrigin();
   currentRoomGroup = room.render3D(scene);
 
   gameState.current_room = room.id;
 
-  animateCameraTo(room.cameraPosition, room.cameraLookAt);
   applyRoomState();
 }
 
