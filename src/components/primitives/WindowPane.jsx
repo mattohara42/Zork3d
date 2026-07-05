@@ -1,11 +1,13 @@
 import { useState } from 'react';
+import { GROUND_Y } from './Ground';
+import { HOUSE_Z } from './HouseShell';
 
-// HouseShell's box is centered at [0, 1, -8] with size [6, 4, 5], so its
-// near face (the one facing the camera) sits at z = -8 + 5/2 = -5.5.
-// Placing the pane at -5.49 sits it just proud of that face so it's
-// visible instead of buried inside the solid box.
-const WINDOW_HEIGHT = 2.2;
-const WINDOW_Z = -5.49;
+// HouseShell's box is centered at HOUSE_Z with depth 5, so its near face
+// (the one facing the camera) sits at HOUSE_Z + 5/2. Placing the pane at
+// HOUSE_Z + 2.51 sits it just proud of that face so it's visible instead
+// of buried inside the solid box.
+const WINDOW_HEIGHT = GROUND_Y + 2.2;
+const WINDOW_Z = HOUSE_Z + 2.51;
 
 /**
  * Behind House's window, set into the near face of the house shell.

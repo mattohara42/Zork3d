@@ -4,25 +4,23 @@ import SceneManager from './SceneManager';
 
 const SKY_COLOR = '#87ceeb';
 const DARK_COLOR = '#000000';
-const CAMERA_POSITION = [18, 15, 18];
-const CAMERA_ZOOM = 28;
-const CAMERA_LOOK_AT = [0, 1, -5];
+const CAMERA_FOV = 60;
 
 /**
- * R3F's <Canvas orthographic camera={{...}}> sets initial position but
- * never calls lookAt() for you, so the view stays pointed down -Z by
- * default. This runs once on mount to lock in the isometric angle. The
- * camera never moves after that - every room is a fresh stage built
- * around this one fixed viewpoint, not a world the camera travels through.
+ * Every room is its own stage: the camera never travels through a shared
+ * world, it just sits fixed at the origin looking straight ahead, and each
+ * room's scene component builds its geometry relative to that fixed
+ * first-person viewpoint (see GROUND_Y in primitives/Ground.jsx). This
+ * runs once on mount to lock that in - Canvas's `camera` prop sets
+ * position/fov but never calls lookAt() for you.
  */
-function IsoCameraRig() {
+function FixedCameraRig() {
   const { camera } = useThree();
 
   useEffect(() => {
-    camera.position.set(...CAMERA_POSITION);
-    camera.zoom = CAMERA_ZOOM;
-    camera.lookAt(...CAMERA_LOOK_AT);
-    camera.updateProjectionMatrix();
+    camera.position.set(0, 0, 0);
+    camera.up.set(0, 1, 0);
+    camera.lookAt(0, 0, -1);
   }, [camera]);
 
   return null;
@@ -31,11 +29,8 @@ function IsoCameraRig() {
 export default function ViewportCanvas({ currentRoom, flags, items, isDark, onInteract }) {
   return (
     <div style={{ flex: '0 0 65%', width: '100%', background: isDark ? DARK_COLOR : SKY_COLOR }}>
-      <Canvas
-        orthographic
-        camera={{ position: CAMERA_POSITION, zoom: CAMERA_ZOOM, near: 0.1, far: 500 }}
-      >
-        <IsoCameraRig />
+      <Canvas camera={{ position: [0, 0, 0], fov: CAMERA_FOV, near: 0.1, far: 1000 }}>
+        <FixedCameraRig />
         <color attach="background" args={[isDark ? DARK_COLOR : SKY_COLOR]} />
         {!isDark && (
           <>

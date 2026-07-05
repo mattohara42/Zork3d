@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { GROUND_Y } from './Ground';
 
+const X = 2;
+const Z = -3;
+
 /**
  * The one clickable object in West of House. onClick fires
  * interactWithObject('mailbox', <open|close>) directly from the mesh,
@@ -10,8 +13,9 @@ export default function Mailbox({ open, hasLeaflet, onInteract }) {
   const [hovered, setHovered] = useState(false);
 
   return (
-    <group position={[3, GROUND_Y + 0.4, -2]}>
+    <group>
       <mesh
+        position={[X, GROUND_Y + 0.85, Z]}
         onClick={(e) => {
           e.stopPropagation();
           onInteract('mailbox', open ? 'close' : 'open');
@@ -30,9 +34,14 @@ export default function Mailbox({ open, hasLeaflet, onInteract }) {
         <meshStandardMaterial color={hovered ? '#d24444' : '#aa2222'} />
       </mesh>
 
-      {/* Lid - flat when closed, flipped up when open */}
+      <mesh position={[X, GROUND_Y + 0.3, Z]}>
+        <cylinderGeometry args={[0.05, 0.05, 0.6, 6]} />
+        <meshStandardMaterial color="#5a3a2a" />
+      </mesh>
+
+      {/* Lid - flat when closed, flipped up against the back when open */}
       <mesh
-        position={open ? [0, 0.4, -0.13] : [0, 0.38, 0]}
+        position={open ? [X, GROUND_Y + 1.15, Z - 0.13] : [X, GROUND_Y + 1.13, Z]}
         rotation={open ? [Math.PI / 2.2, 0, 0] : [0, 0, 0]}
       >
         <boxGeometry args={[0.4, 0.05, 0.3]} />
@@ -40,7 +49,7 @@ export default function Mailbox({ open, hasLeaflet, onInteract }) {
       </mesh>
 
       {open && hasLeaflet && (
-        <mesh position={[0, 0.05, 0]}>
+        <mesh position={[X, GROUND_Y + 0.8, Z]}>
           <boxGeometry args={[0.25, 0.02, 0.18]} />
           <meshStandardMaterial color="#ffffff" />
         </mesh>
