@@ -7,6 +7,7 @@ export default function App() {
   const {
     currentRoom,
     room,
+    roomText,
     exits,
     isDark,
     isUnderground,
@@ -40,6 +41,7 @@ export default function App() {
       />
       <TextTerminal
         room={room}
+        roomText={roomText}
         exits={exits}
         isDark={isDark}
         terminalLogs={terminalLogs}

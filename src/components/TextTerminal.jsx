@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 
 const DIRECTIONS = ['north', 'south', 'east', 'west', 'up', 'down'];
 
-export default function TextTerminal({ room, exits, isDark, terminalLogs, onMove, onCommand }) {
+export default function TextTerminal({ room, roomText, exits, isDark, terminalLogs, onMove, onCommand }) {
   const [input, setInput] = useState('');
   const logRef = useRef(null);
 
@@ -32,7 +32,7 @@ export default function TextTerminal({ room, exits, isDark, terminalLogs, onMove
         {isDark ? 'Pitch Black' : room.name}
       </h2>
       <p style={{ margin: '0 0 12px 0', lineHeight: 1.4, fontSize: 15 }}>
-        {isDark ? 'It is pitch black. You are likely to be eaten by a grue.' : room.text}
+        {isDark ? 'It is pitch black. You are likely to be eaten by a grue.' : roomText}
       </p>
 
       <div

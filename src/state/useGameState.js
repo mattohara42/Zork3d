@@ -19,7 +19,11 @@ const LAMP_OFF_COMMANDS = ['turn off lamp', 'extinguish lamp', 'douse lamp'];
 const HELP_TEXT =
   'Commands: north/south/east/west/up/down/in/out (or n/s/e/w/u/d), look, ' +
   'examine <thing>, open/close <thing>, take/drop <thing>, read <thing>, ' +
-  'inventory, light lamp / turn off lamp.';
+  'move <thing>, inventory, light lamp / turn off lamp.';
+
+function resolveRoomText(room, flags) {
+  return typeof room.text === 'function' ? room.text(flags) : room.text;
+}
 
 /**
  * Central game-state hook. Mirrors the phases of the original vanilla
@@ -35,6 +39,9 @@ export function useGameState() {
   const [flags, setFlags] = useState({
     mailboxOpen: false,
     windowOpen: false,
+    rugMoved: false,
+    trapdoorOpen: false,
+    trapdoorBarred: false,
   });
   const [items, setItems] = useState(INITIAL_ITEMS);
   const [terminalLogs, setTerminalLogs] = useState([]);
@@ -46,6 +53,7 @@ export function useGameState() {
   // feel different even though the player can see.
   const isDark = !!room.dark && !hasLampLit;
   const isUnderground = !!room.dark && hasLampLit;
+  const roomText = resolveRoomText(room, flags);
 
   const log = useCallback((message) => {
     setTerminalLogs((prev) => [...prev, message]);
@@ -79,7 +87,8 @@ export function useGameState() {
     (direction) => {
       const targetId = room.exits[direction];
       if (!targetId) {
-        log("You can't go that way.");
+        const blockedMessage = room.blockedExits && room.blockedExits[direction];
+        log(blockedMessage || "You can't go that way.");
         return;
       }
       const guard = room.exitGuards && room.exitGuards[direction];
@@ -88,7 +97,19 @@ export function useGameState() {
         log(blockedMessage);
         return;
       }
+
       setCurrentRoom(targetId);
+
+      const targetRoom = ROOMS[targetId];
+      const enterResult = targetRoom.onEnter && targetRoom.onEnter(flags);
+      if (enterResult) {
+        if (enterResult.flagUpdates) {
+          setFlags((prev) => ({ ...prev, ...enterResult.flagUpdates }));
+        }
+        if (enterResult.message) {
+          log(enterResult.message);
+        }
+      }
     },
     [room, flags, log]
   );
@@ -114,6 +135,21 @@ export function useGameState() {
         } else {
           setFlags((prev) => ({ ...prev, windowOpen: true }));
           log('With great effort, you open the window far enough to allow entry.');
+        }
+        return;
+      }
+      if (noun === 'trap door' || noun === 'trapdoor') {
+        if (currentRoom === 'livingRoom' && flags.rugMoved) {
+          if (flags.trapdoorOpen) {
+            log('It is already open.');
+          } else {
+            setFlags((prev) => ({ ...prev, trapdoorOpen: true }));
+            log('The door reluctantly opens to reveal a rickety staircase descending into darkness.');
+          }
+        } else if (currentRoom === 'cellar') {
+          log('The door is locked from above.');
+        } else {
+          log("You don't see that here.");
         }
         return;
       }
@@ -146,6 +182,21 @@ export function useGameState() {
         }
         return;
       }
+      if (noun === 'trap door' || noun === 'trapdoor') {
+        if (currentRoom === 'livingRoom' && flags.rugMoved) {
+          if (!flags.trapdoorOpen) {
+            log('It is already closed.');
+          } else {
+            setFlags((prev) => ({ ...prev, trapdoorOpen: false }));
+            log('The door swings shut and closes.');
+          }
+        } else if (currentRoom === 'cellar') {
+          log('The door closes and locks.');
+        } else {
+          log("You don't see that here.");
+        }
+        return;
+      }
       log("You can't close that.");
     },
     [currentRoom, flags, log]
@@ -155,6 +206,22 @@ export function useGameState() {
     (noun) => {
       if (noun === 'mailbox') {
         log('It is securely anchored.');
+        return;
+      }
+      if (noun === 'rug' || noun === 'carpet') {
+        if (currentRoom === 'livingRoom') {
+          log('The rug is extremely heavy and cannot be carried.');
+        } else {
+          log("You can't see that here.");
+        }
+        return;
+      }
+      if (noun === 'trophy case' || noun === 'case') {
+        if (currentRoom === 'livingRoom') {
+          log('The trophy case is securely fastened to the wall.');
+        } else {
+          log("You can't see that here.");
+        }
         return;
       }
       const item = findItemByName(noun);
@@ -177,7 +244,7 @@ export function useGameState() {
       setInventory((prev) => [...prev, item.id]);
       log('Taken.');
     },
-    [findItemByName, isItemReachable, log]
+    [currentRoom, findItemByName, isItemReachable, log]
   );
 
   const dropItem = useCallback(
@@ -195,6 +262,25 @@ export function useGameState() {
       log('Dropped.');
     },
     [findItemByName, currentRoom, log]
+  );
+
+  /** "move"/"push" the rug, revealing the trap door underneath - one-shot. */
+  const moveObject = useCallback(
+    (noun) => {
+      if (noun === 'rug' || noun === 'carpet') {
+        if (currentRoom !== 'livingRoom') {
+          log("You don't see that here.");
+        } else if (flags.rugMoved) {
+          log('Having moved the carpet previously, you find it impossible to move it again.');
+        } else {
+          setFlags((prev) => ({ ...prev, rugMoved: true }));
+          log('With a great effort, the rug is moved to one side of the room, revealing the dusty cover of a closed trap door.');
+        }
+        return;
+      }
+      log("You can't move that.");
+    },
+    [currentRoom, flags.rugMoved, log]
   );
 
   const examineObject = useCallback(
@@ -227,6 +313,36 @@ export function useGameState() {
         }
         return;
       }
+      if (noun === 'rug' || noun === 'carpet') {
+        if (currentRoom !== 'livingRoom') {
+          log("You don't see that here.");
+        } else if (flags.rugMoved) {
+          log('The rug has been moved to one side of the room.');
+        } else {
+          log('A large oriental rug, covering most of the floor.');
+        }
+        return;
+      }
+      if (noun === 'trophy case' || noun === 'case') {
+        if (currentRoom !== 'livingRoom') {
+          log("You don't see that here.");
+        } else {
+          log("There's nothing special about the trophy case.");
+        }
+        return;
+      }
+      if (noun === 'trap door' || noun === 'trapdoor') {
+        if (currentRoom === 'livingRoom' && flags.rugMoved) {
+          log(
+            flags.trapdoorOpen
+              ? 'The open trap door reveals a rickety staircase descending into darkness.'
+              : 'A closed trap door is set into the floor.'
+          );
+        } else {
+          log("You don't see that here.");
+        }
+        return;
+      }
       const item = findItemByName(noun);
       if (item && isItemReachable(item)) {
         log(item.description);
@@ -234,7 +350,7 @@ export function useGameState() {
       }
       log("You don't see that here.");
     },
-    [currentRoom, flags.windowOpen, describeMailbox, findItemByName, isItemReachable, log]
+    [currentRoom, flags.windowOpen, flags.rugMoved, flags.trapdoorOpen, describeMailbox, findItemByName, isItemReachable, log]
   );
 
   const readItem = useCallback(
@@ -259,8 +375,8 @@ export function useGameState() {
   }, [inventory, items, log]);
 
   const lookAround = useCallback(() => {
-    log(room.text);
-  }, [room, log]);
+    log(roomText);
+  }, [roomText, log]);
 
   const setLampLit = useCallback(
     (lit) => {
@@ -278,12 +394,13 @@ export function useGameState() {
         case 'close': closeObject(objectName); break;
         case 'take': takeItem(objectName); break;
         case 'drop': dropItem(objectName); break;
+        case 'move': moveObject(objectName); break;
         case 'examine': examineObject(objectName); break;
         case 'read': readItem(objectName); break;
         default: log('Nothing happens.');
       }
     },
-    [openObject, closeObject, takeItem, dropItem, examineObject, readItem, log]
+    [openObject, closeObject, takeItem, dropItem, moveObject, examineObject, readItem, log]
   );
 
   /** Parses a free-text command line, same verb set as the vanilla engine. */
@@ -330,6 +447,9 @@ export function useGameState() {
         case 'take':
         case 'get': takeItem(noun); break;
         case 'drop': dropItem(noun); break;
+        case 'move':
+        case 'push':
+        case 'raise': moveObject(noun); break;
         case 'examine':
         case 'x':
         case 'look': examineObject(noun); break;
@@ -337,7 +457,7 @@ export function useGameState() {
         default: log("I don't understand that command.");
       }
     },
-    [moveRoom, lookAround, showInventory, setLampLit, log, openObject, closeObject, takeItem, dropItem, examineObject, readItem]
+    [moveRoom, lookAround, showInventory, setLampLit, log, openObject, closeObject, takeItem, dropItem, moveObject, examineObject, readItem]
   );
 
   const exits = useMemo(() => room.exits, [room]);
@@ -345,6 +465,7 @@ export function useGameState() {
   return {
     currentRoom,
     room,
+    roomText,
     exits,
     isDark,
     isUnderground,
