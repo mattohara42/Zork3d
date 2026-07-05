@@ -1,4 +1,5 @@
 import { useGameState } from './state/useGameState';
+import { useKeyboardMovement } from './state/useKeyboardMovement';
 import ViewportCanvas from './components/ViewportCanvas';
 import TextTerminal from './components/TextTerminal';
 
@@ -15,6 +16,8 @@ export default function App() {
     interactWithObject,
     runCommand,
   } = useGameState();
+
+  useKeyboardMovement(moveRoom);
 
   return (
     <div
