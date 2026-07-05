@@ -161,19 +161,19 @@ export const ROOMS = {
         : '\nA nasty-looking troll, brandishing a bloody axe, blocks all passages out of the room.'),
     dark: true,
     // East (EW-Passage) and west (the Maze) both really do open once the
-    // troll is dealt with in canon - west is wired to the Maze once
-    // that's built; east stays unbuilt since EW-Passage and the rest of
-    // that side of the dungeon are a much larger separate pass.
-    exits: { south: 'cellar', east: null, west: null },
+    // troll is dealt with in canon. West has a real destination now that
+    // the Maze exists, gated the same way the Cellar's `up`/Living
+    // Room's `down` already are; east stays unbuilt since EW-Passage and
+    // the rest of that side of the dungeon are a much larger separate pass.
+    exits: { south: 'cellar', east: null, west: 'maze1' },
     blockedExits: {
       east: (flags) =>
         flags.trollDefeated
           ? "The passage beyond hasn't been explored yet."
           : 'The troll fends you off with a menacing gesture.',
-      west: (flags) =>
-        flags.trollDefeated
-          ? "The passage beyond hasn't been explored yet."
-          : 'The troll fends you off with a menacing gesture.',
+    },
+    exitGuards: {
+      west: (flags) => (flags.trollDefeated ? null : 'The troll fends you off with a menacing gesture.'),
     },
   },
 
@@ -380,5 +380,265 @@ export const ROOMS = {
       'above. A rainbow crosses over the falls to the east and a narrow path ' +
       'continues to the southwest.',
     exits: { south: 'canyonBottom' },
+  },
+
+  // The Maze: 15 numbered rooms, 4 dead ends, and the Grating Room, past
+  // the Troll Room's now-unblocked west exit. Every connection below is
+  // confirmed from the source's ROOM definitions and MAZE-DIODES
+  // routine, not guessed - "twisty little passages, all alike" is a
+  // deliberately disorienting, partly self-looping graph, and changing
+  // it would defeat the point of the puzzle.
+  //
+  // Our engine only supports the 6 cardinal/vertical directions, but a
+  // good third of the maze's real connections are diagonal-only (NE/NW/
+  // SE/SW) with no cardinal alternative offered. Two remapping rules,
+  // consistent with how the house ring and the canyon already handle
+  // this:
+  //   1. If a diagonal duplicates a cardinal to the same destination
+  //      (e.g. Maze-14's NE and S both go to Maze-7), drop the diagonal.
+  //   2. Otherwise, remap the diagonal to whichever cardinal on that
+  //      room is still free, favoring the compass-adjacent one. Traced
+  //      the whole graph afterward to confirm nothing became unreachable.
+  //
+  // The skeleton (with the keys needed to unlock the grate from inside)
+  // and the rusty knife are real objects at Maze-5 in the source, but
+  // both come with their own mini-puzzles (a curse if the skeleton is
+  // disturbed carelessly, the sword's blue glow near the rusty knife) -
+  // left as flavor text only for now, not interactive items.
+  maze1: {
+    id: 'maze1',
+    environment: 'underground',
+    name: 'Maze',
+    text: 'This is part of a maze of twisty little passages, all alike.',
+    dark: true,
+    exits: { east: 'trollRoom', north: 'maze1', south: 'maze2', west: 'maze4' },
+  },
+
+  maze2: {
+    id: 'maze2',
+    environment: 'underground',
+    name: 'Maze',
+    text: 'This is part of a maze of twisty little passages, all alike.',
+    dark: true,
+    exits: { south: 'maze1', down: 'maze4', east: 'maze3' },
+    exitGuards: {
+      down: () => ({
+        message:
+          "You won't be able to get back up to the tunnel you are going " +
+          'through when it gets to the next room.',
+      }),
+    },
+  },
+
+  maze3: {
+    id: 'maze3',
+    environment: 'underground',
+    name: 'Maze',
+    text: 'This is part of a maze of twisty little passages, all alike.',
+    dark: true,
+    exits: { west: 'maze2', north: 'maze4', up: 'maze5' },
+  },
+
+  maze4: {
+    id: 'maze4',
+    environment: 'underground',
+    name: 'Maze',
+    text: 'This is part of a maze of twisty little passages, all alike.',
+    dark: true,
+    exits: { west: 'maze3', north: 'maze1', east: 'deadEnd1' },
+  },
+
+  deadEnd1: {
+    id: 'deadEnd1',
+    environment: 'underground',
+    name: 'Dead End',
+    text: 'You have come to a dead end in the maze.',
+    dark: true,
+    exits: { south: 'maze4' },
+  },
+
+  // SW (no cardinal alt) mapped to west; the skeleton's own LDESC
+  // sentence is appended here exactly as the source auto-lists it
+  // alongside the room text.
+  maze5: {
+    id: 'maze5',
+    environment: 'underground',
+    name: 'Maze',
+    text:
+      'This is part of a maze of twisty little passages, all alike. ' +
+      'A skeleton, probably the remains of a luckless adventurer, lies here.',
+    dark: true,
+    exits: { east: 'deadEnd2', north: 'maze3', west: 'maze6' },
+  },
+
+  deadEnd2: {
+    id: 'deadEnd2',
+    environment: 'underground',
+    name: 'Dead End',
+    text: 'You have come to a dead end in the maze.',
+    dark: true,
+    exits: { west: 'maze5' },
+  },
+
+  maze6: {
+    id: 'maze6',
+    environment: 'underground',
+    name: 'Maze',
+    text: 'This is part of a maze of twisty little passages, all alike.',
+    dark: true,
+    exits: { down: 'maze5', east: 'maze7', west: 'maze6', up: 'maze9' },
+  },
+
+  maze7: {
+    id: 'maze7',
+    environment: 'underground',
+    name: 'Maze',
+    text: 'This is part of a maze of twisty little passages, all alike.',
+    dark: true,
+    exits: { up: 'maze14', west: 'maze6', down: 'deadEnd1', east: 'maze8', south: 'maze15' },
+    exitGuards: {
+      down: () => ({
+        message:
+          "You won't be able to get back up to the tunnel you are going " +
+          'through when it gets to the next room.',
+      }),
+    },
+  },
+
+  // NE (no cardinal alt) mapped to north; SE (no cardinal alt) mapped
+  // to south.
+  maze8: {
+    id: 'maze8',
+    environment: 'underground',
+    name: 'Maze',
+    text: 'This is part of a maze of twisty little passages, all alike.',
+    dark: true,
+    exits: { north: 'maze7', west: 'maze8', south: 'deadEnd3' },
+  },
+
+  deadEnd3: {
+    id: 'deadEnd3',
+    environment: 'underground',
+    name: 'Dead End',
+    text: 'You have come to a dead end in the maze.',
+    dark: true,
+    exits: { north: 'maze8' },
+  },
+
+  // NW self-loop (no cardinal alt) mapped to up - every other cardinal
+  // here is already spoken for by a real connection.
+  maze9: {
+    id: 'maze9',
+    environment: 'underground',
+    name: 'Maze',
+    text: 'This is part of a maze of twisty little passages, all alike.',
+    dark: true,
+    exits: { north: 'maze6', down: 'maze11', east: 'maze10', south: 'maze13', west: 'maze12', up: 'maze9' },
+    exitGuards: {
+      down: () => ({
+        message:
+          "You won't be able to get back up to the tunnel you are going " +
+          'through when it gets to the next room.',
+      }),
+    },
+  },
+
+  maze10: {
+    id: 'maze10',
+    environment: 'underground',
+    name: 'Maze',
+    text: 'This is part of a maze of twisty little passages, all alike.',
+    dark: true,
+    exits: { east: 'maze9', west: 'maze13', up: 'maze11' },
+  },
+
+  // NE (no cardinal alt) mapped to east; NW mapped to north; SW mapped
+  // to west (pairs cleanly with Maze-12's own SW-to-here, also mapped
+  // to west).
+  maze11: {
+    id: 'maze11',
+    environment: 'underground',
+    name: 'Maze',
+    text: 'This is part of a maze of twisty little passages, all alike.',
+    dark: true,
+    exits: { down: 'maze10', east: 'gratingRoom', north: 'maze13', west: 'maze12' },
+  },
+
+  // The grate itself is real in canon but can only be unlocked from
+  // inside here (a skeleton key from Maze-5, not built yet - see the
+  // Grating Clearing note in the forest data), so `up` stays a generic
+  // "closed" block rather than a fabricated permanent one. SW (no
+  // cardinal alt) mapped to west.
+  gratingRoom: {
+    id: 'gratingRoom',
+    environment: 'underground',
+    name: 'Grating Room',
+    text:
+      'You are in a small room near the maze. There are twisty passages ' +
+      'in the immediate vicinity. Above you is a grating locked with a ' +
+      'skull-and-crossbones lock.',
+    dark: true,
+    exits: { west: 'maze11', up: null },
+    blockedExits: { up: 'The grating is closed.' },
+  },
+
+  // SW (no cardinal alt) mapped to west, pairing with Maze-11's own
+  // west-to-here.
+  maze12: {
+    id: 'maze12',
+    environment: 'underground',
+    name: 'Maze',
+    text: 'This is part of a maze of twisty little passages, all alike.',
+    dark: true,
+    exits: { down: 'maze5', west: 'maze11', east: 'maze13', up: 'maze9', north: 'deadEnd4' },
+    exitGuards: {
+      down: () => ({
+        message:
+          "You won't be able to get back up to the tunnel you are going " +
+          'through when it gets to the next room.',
+      }),
+    },
+  },
+
+  deadEnd4: {
+    id: 'deadEnd4',
+    environment: 'underground',
+    name: 'Dead End',
+    text: 'You have come to a dead end in the maze.',
+    dark: true,
+    exits: { south: 'maze12' },
+  },
+
+  maze13: {
+    id: 'maze13',
+    environment: 'underground',
+    name: 'Maze',
+    text: 'This is part of a maze of twisty little passages, all alike.',
+    dark: true,
+    exits: { east: 'maze9', down: 'maze12', south: 'maze10', west: 'maze11' },
+  },
+
+  // NW self-loop (no cardinal alt) mapped to north; NE dropped as
+  // redundant with the existing cardinal south-to-Maze-7.
+  maze14: {
+    id: 'maze14',
+    environment: 'underground',
+    name: 'Maze',
+    text: 'This is part of a maze of twisty little passages, all alike.',
+    dark: true,
+    exits: { west: 'maze15', north: 'maze14', south: 'maze7' },
+  },
+
+  // SE (no cardinal alt, leads to the Cyclops Room) mapped to east -
+  // left unbuilt for now, a separate pass past its own puzzle chain
+  // (the cyclops, the "ULYSSES" wall-breaking shortcut to the Living
+  // Room, the Treasure Room).
+  maze15: {
+    id: 'maze15',
+    environment: 'underground',
+    name: 'Maze',
+    text: 'This is part of a maze of twisty little passages, all alike.',
+    dark: true,
+    exits: { west: 'maze14', south: 'maze7', east: null },
   },
 };

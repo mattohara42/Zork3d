@@ -22,6 +22,15 @@ import CanyonView from './CanyonView';
 import CliffMiddle from './CliffMiddle';
 import CanyonBottom from './CanyonBottom';
 import EndOfRainbow from './EndOfRainbow';
+import MazeRoom from './MazeRoom';
+import MazeDeadEnd from './MazeDeadEnd';
+import GratingRoom from './GratingRoom';
+
+const MAZE_ROOM_IDS = [
+  'maze1', 'maze2', 'maze3', 'maze4', 'maze5', 'maze6', 'maze7',
+  'maze8', 'maze9', 'maze10', 'maze11', 'maze12', 'maze13', 'maze14', 'maze15',
+];
+const DEAD_END_IDS = ['deadEnd1', 'deadEnd2', 'deadEnd3', 'deadEnd4'];
 
 export const RoomRegistry = {
   westOfHouse: (props) => <WestOfHouse {...props} />,
@@ -48,4 +57,9 @@ export const RoomRegistry = {
   cliffMiddle: (props) => <CliffMiddle {...props} />,
   canyonBottom: (props) => <CanyonBottom {...props} />,
   endOfRainbow: (props) => <EndOfRainbow {...props} />,
+  gratingRoom: (props) => <GratingRoom {...props} />,
+  ...Object.fromEntries(
+    MAZE_ROOM_IDS.map((id) => [id, (props) => <MazeRoom roomId={id} {...props} />])
+  ),
+  ...Object.fromEntries(DEAD_END_IDS.map((id) => [id, (props) => <MazeDeadEnd {...props} />])),
 };

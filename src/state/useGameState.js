@@ -147,12 +147,17 @@ export function useGameState() {
       // allows it, and if the object has flagUpdates they're applied as a
       // side effect of a *successful* move (the up-chimney puzzle needs
       // this: climbing out with the lamp and at most one other item
-      // succeeds, which also resets the barred trap door).
+      // succeeds, which also resets the barred trap door). A `message`
+      // logs *before* the move completes - the maze's one-way "diode"
+      // passages warn you can't come back this way before you commit to it.
       const guard = room.exitGuards && room.exitGuards[direction];
       const guardResult = guard && guard(flags, inventory);
       if (typeof guardResult === 'string') {
         log(guardResult);
         return;
+      }
+      if (guardResult && guardResult.message) {
+        log(guardResult.message);
       }
 
       setCurrentRoom(targetId);
