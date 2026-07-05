@@ -33,3 +33,9 @@ manual scene-graph teardown to manage.
 
 The original prototype: a single-file vanilla Three.js implementation with
 no build step. Superseded by the React/R3F app above, kept for reference.
+
+## Project status, decisions, and backlog
+
+See [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) for the full architectural
+decision log, current room/item state, source material references, and
+the backlog toward feature parity with the original game.
