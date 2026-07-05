@@ -12,6 +12,7 @@ const Z = -3;
  */
 export default function Mailbox({ open, hasLeaflet, onInteract }) {
   const [hovered, setHovered] = useState(false);
+  const [leafletHovered, setLeafletHovered] = useState(false);
 
   return (
     <group>
@@ -49,11 +50,32 @@ export default function Mailbox({ open, hasLeaflet, onInteract }) {
         <meshStandardMaterial color="#8b1f1f" />
       </mesh>
 
+      {/* Sits just above the box's own top face (GROUND_Y + 1.10) so it
+          pokes out of the open lid instead of being hidden inside the
+          mailbox's solid geometry. */}
       {open && hasLeaflet && (
-        <mesh position={[X, GROUND_Y + 0.8, Z]}>
-          <boxGeometry args={[0.25, 0.02, 0.18]} />
-          <meshStandardMaterial color="#ffffff" />
-        </mesh>
+        <group>
+          <mesh
+            position={[X, GROUND_Y + 1.16, Z]}
+            onClick={(e) => {
+              e.stopPropagation();
+              onInteract('leaflet', 'read');
+            }}
+            onPointerOver={(e) => {
+              e.stopPropagation();
+              setLeafletHovered(true);
+              document.body.style.cursor = 'pointer';
+            }}
+            onPointerOut={() => {
+              setLeafletHovered(false);
+              document.body.style.cursor = 'auto';
+            }}
+          >
+            <boxGeometry args={[0.25, 0.02, 0.18]} />
+            <meshStandardMaterial color={leafletHovered ? '#f5f5f5' : '#ffffff'} />
+          </mesh>
+          <ObjectLabel text="leaflet" visible={leafletHovered} position={[X, GROUND_Y + 1.4, Z]} />
+        </group>
       )}
 
       <ObjectLabel text="mailbox" visible={hovered} position={[X, GROUND_Y + 1.5, Z]} />
