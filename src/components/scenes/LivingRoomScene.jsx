@@ -10,11 +10,18 @@ const RUG_CENTER_X = 0;
 const RUG_MOVED_X = -2.6;
 const RUG_Z = -2;
 
+// Kept close to center-x and deep enough (near the back wall) to stay
+// inside the camera's field of view - a shallow depth with a wide x
+// offset (as this originally was, at x=3.5/z=-2) puts the object outside
+// the frustum entirely, invisible despite "working" logically.
+const CASE_X = 2;
+const CASE_Z = -3.8;
+
 function TrophyCase() {
   const [hovered, setHovered] = useState(false);
 
   return (
-    <group position={[3.5, GROUND_Y + 1, -2]}>
+    <group position={[CASE_X, GROUND_Y + 1, CASE_Z]}>
       <mesh
         onPointerOver={(e) => {
           e.stopPropagation();
@@ -67,6 +74,62 @@ function Rug({ moved, onInteract }) {
   );
 }
 
+function Lamp({ onInteract }) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <group position={[CASE_X, GROUND_Y + 2.15, CASE_Z]}>
+      <mesh
+        onClick={(e) => {
+          e.stopPropagation();
+          onInteract('lamp', 'take');
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHovered(true);
+          document.body.style.cursor = 'pointer';
+        }}
+        onPointerOut={() => {
+          setHovered(false);
+          document.body.style.cursor = 'auto';
+        }}
+      >
+        <cylinderGeometry args={[0.12, 0.15, 0.25, 8]} />
+        <meshStandardMaterial color={hovered ? '#e8c66a' : '#c9a227'} />
+      </mesh>
+      <ObjectLabel text="brass lantern" visible={hovered} position={[0, 0.35, 0]} />
+    </group>
+  );
+}
+
+function Sword({ onInteract }) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <group position={[CASE_X, GROUND_Y + 2.7, CASE_Z - 0.3]} rotation={[0.3, 0, 0]}>
+      <mesh
+        onClick={(e) => {
+          e.stopPropagation();
+          onInteract('sword', 'take');
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHovered(true);
+          document.body.style.cursor = 'pointer';
+        }}
+        onPointerOut={() => {
+          setHovered(false);
+          document.body.style.cursor = 'auto';
+        }}
+      >
+        <boxGeometry args={[0.08, 0.9, 0.02]} />
+        <meshStandardMaterial color={hovered ? '#e8e8e8' : '#c0c0c8'} />
+      </mesh>
+      <ObjectLabel text="sword" visible={hovered} position={[0, 0.6, 0]} />
+    </group>
+  );
+}
+
 function TrapDoor({ rugMoved, open, onInteract }) {
   const [hovered, setHovered] = useState(false);
 
@@ -99,7 +162,7 @@ function TrapDoor({ rugMoved, open, onInteract }) {
   );
 }
 
-export default function LivingRoomScene({ flags, onInteract }) {
+export default function LivingRoomScene({ flags, items, onInteract }) {
   return (
     <group>
       <Ground color="#8b6b47" size={9} />
@@ -124,6 +187,8 @@ export default function LivingRoomScene({ flags, onInteract }) {
       </mesh>
 
       <TrophyCase />
+      {items.lamp.location === 'livingRoom' && <Lamp onInteract={onInteract} />}
+      {items.sword.location === 'livingRoom' && <Sword onInteract={onInteract} />}
       <Rug moved={flags.rugMoved} onInteract={onInteract} />
       <TrapDoor rugMoved={flags.rugMoved} open={flags.trapdoorOpen} onInteract={onInteract} />
     </group>

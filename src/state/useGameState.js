@@ -21,8 +21,12 @@ const HELP_TEXT =
   'examine <thing>, open/close <thing>, take/drop <thing>, read <thing>, ' +
   'move <thing>, inventory, light lamp / turn off lamp.';
 
-function resolveRoomText(room, flags) {
-  return typeof room.text === 'function' ? room.text(flags) : room.text;
+function resolveRoomText(room, flags, items, currentRoom) {
+  const base = typeof room.text === 'function' ? room.text(flags) : room.text;
+  const floorLines = Object.values(items)
+    .filter((item) => item.location === currentRoom && item.floorText)
+    .map((item) => item.floorText);
+  return floorLines.length > 0 ? `${base}\n${floorLines.join('\n')}` : base;
 }
 
 /**
@@ -53,7 +57,7 @@ export function useGameState() {
   // feel different even though the player can see.
   const isDark = !!room.dark && !hasLampLit;
   const isUnderground = !!room.dark && hasLampLit;
-  const roomText = resolveRoomText(room, flags);
+  const roomText = resolveRoomText(room, flags, items, currentRoom);
 
   const log = useCallback((message) => {
     setTerminalLogs((prev) => [...prev, message]);
@@ -224,6 +228,14 @@ export function useGameState() {
         }
         return;
       }
+      if (noun === 'troll') {
+        if (currentRoom === 'trollRoom') {
+          log("You can't take the troll with you.");
+        } else {
+          log("You can't see that here.");
+        }
+        return;
+      }
       const item = findItemByName(noun);
       if (!item || !isItemReachable(item)) {
         log("You can't see that here.");
@@ -259,9 +271,15 @@ export function useGameState() {
         [item.id]: { ...prev[item.id], location: currentRoom },
       }));
       setInventory((prev) => prev.filter((id) => id !== item.id));
+      // Dropping the lit lamp leaves it behind - you no longer have
+      // portable light with you (the room you left it in staying lit is
+      // a real Zork mechanic, but out of scope here).
+      if (item.isLightSource && hasLampLit) {
+        setHasLampLit(false);
+      }
       log('Dropped.');
     },
-    [findItemByName, currentRoom, log]
+    [findItemByName, currentRoom, hasLampLit, log]
   );
 
   /** "move"/"push" the rug, revealing the trap door underneath - one-shot. */
@@ -343,6 +361,14 @@ export function useGameState() {
         }
         return;
       }
+      if (noun === 'troll') {
+        if (currentRoom === 'trollRoom') {
+          log('A nasty-looking troll, brandishing a bloody axe, blocks all passages out of the room.');
+        } else {
+          log("You don't see that here.");
+        }
+        return;
+      }
       const item = findItemByName(noun);
       if (item && isItemReachable(item)) {
         log(item.description);
@@ -380,10 +406,20 @@ export function useGameState() {
 
   const setLampLit = useCallback(
     (lit) => {
+      // Deliberately stricter than "reachable" (room-or-inventory): our
+      // isDark/isUnderground check is a global hasLampLit boolean that
+      // travels with the player, not tied to the lamp's actual location.
+      // If turning it on merely required being in the same room, lighting
+      // it and walking away would leave the player "carrying" light they
+      // in fact left behind on the trophy case.
+      if (lit && items.lamp.location !== 'inventory') {
+        log("You don't have a lamp.");
+        return;
+      }
       setHasLampLit(lit);
       log(lit ? 'The lamp is now on.' : 'The lamp is now off.');
     },
-    [log]
+    [items.lamp, log]
   );
 
   /** Generic dispatcher matching the requested hook shape. */

@@ -7,16 +7,13 @@ const WALL_CENTER_Y = GROUND_Y + WALL_HEIGHT / 2;
 // Cellar is almost always seen either pitch black or by dim lantern light
 // (see ViewportCanvas's isDark/isUnderground split), so geometry here is
 // deliberately plain - it reads as a shape caught by the spotlight rather
-// than something meant to be examined in bright daylight.
+// than something meant to be examined in bright daylight. No wall directly
+// ahead (-Z) - that's the narrow passageway leading north to the Troll Room.
 export default function CellarScene() {
   return (
     <group>
       <Ground color="#3a3226" size={9} />
 
-      <mesh position={[0, WALL_CENTER_Y, -4.5]}>
-        <boxGeometry args={[9, WALL_HEIGHT, 0.2]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
       <mesh position={[4.5, WALL_CENTER_Y, 0]}>
         <boxGeometry args={[0.2, WALL_HEIGHT, 9]} />
         <meshStandardMaterial color={WALL_COLOR} />

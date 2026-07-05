@@ -91,9 +91,9 @@ export const ROOMS = {
   cellar: {
     id: 'cellar',
     name: 'Cellar',
-    text: 'You are in a dark and damp cellar. On the west is the bottom of a steep metal ramp which is unclimbable.',
+    text: 'You are in a dark and damp cellar, with a narrow passageway leading north. On the west is the bottom of a steep metal ramp which is unclimbable.',
     dark: true,
-    exits: { up: 'livingRoom', west: null },
+    exits: { up: 'livingRoom', north: 'trollRoom', west: null },
     blockedExits: {
       west: 'You try to ascend the ramp, but it is impossible, and you slide back down.',
     },
@@ -110,6 +110,27 @@ export const ROOMS = {
         };
       }
       return null;
+    },
+  },
+
+  trollRoom: {
+    id: 'trollRoom',
+    name: 'The Troll Room',
+    // The room's own LDESC, plus the troll's LDESC - in the original
+    // source these are two separate objects auto-listed together by the
+    // engine, not one hand-written paragraph.
+    text:
+      'This is a small room with passages to the east and south and a forbidding ' +
+      'hole leading west. Bloodstains and deep scratches (perhaps made by an axe) ' +
+      'mar the walls.\nA nasty-looking troll, brandishing a bloody axe, blocks all ' +
+      'passages out of the room.',
+    dark: true,
+    exits: { south: 'cellar', east: null, west: null },
+    // No combat system yet, so the troll is a permanent (for now)
+    // roadblock exactly like the original until you deal with it.
+    blockedExits: {
+      east: 'The troll fends you off with a menacing gesture.',
+      west: 'The troll fends you off with a menacing gesture.',
     },
   },
 };

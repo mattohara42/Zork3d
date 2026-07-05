@@ -5,6 +5,7 @@ import BehindHouseScene from './scenes/BehindHouseScene';
 import KitchenScene from './scenes/KitchenScene';
 import LivingRoomScene from './scenes/LivingRoomScene';
 import CellarScene from './scenes/CellarScene';
+import TrollRoomScene from './scenes/TrollRoomScene';
 
 /**
  * Dispatches on currentRoom and returns that room's primitives. Adding a
@@ -26,9 +27,11 @@ export default function SceneManager({ currentRoom, flags, items, onInteract }) 
     case 'kitchen':
       return <KitchenScene />;
     case 'livingRoom':
-      return <LivingRoomScene flags={flags} onInteract={onInteract} />;
+      return <LivingRoomScene flags={flags} items={items} onInteract={onInteract} />;
     case 'cellar':
       return <CellarScene />;
+    case 'trollRoom':
+      return <TrollRoomScene />;
     default:
       return null;
   }
