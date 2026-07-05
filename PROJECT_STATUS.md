@@ -37,6 +37,8 @@ Update this file when a decision or the room/item map changes meaningfully.
 | 25 | Rooms can carry their own one-time score bonus via `onEnter`'s new `scoreBonus` field, awarded the same way an item's first-take `value` is | The Treasure Room has `VALUE 25` on the *room object* in the source, not an item - needed a small, generic extension rather than a one-off special case for this single room |
 | 26 | `blockedExits` values can now be a function of `flags`, not just a fixed string | The Chasm Room's `down` ("Are you out of your mind?") is fixed, but this mirrors how `text` already supported functions - kept the two hooks consistent rather than adding a one-off case |
 | 27 | Dam mechanics (`gateFlag`/`gatesOpen`) are two independent booleans, not one | `gateFlag` mirrors the green bubble's "primed" state (set/cleared by the yellow/brown buttons) and persists regardless of the gates themselves; `gatesOpen` mirrors `GATES-OPEN` and can only be toggled by `turn bolt` while primed. Matches the source's `BOLT-F`/`BUTTON-F` split exactly - priming and actuating are genuinely separate steps |
+| 28 | The thief is a stationary "guardian" NPC in the Treasure Room, not the source's map-wide roaming demon | `I-THIEF` ticks every turn and wanders the *entire* room graph (including areas not built yet - Temple, Egyptian Room, Hades, Atlantis), stealing treasures into his bag along the way; replicating that needs a per-turn background-event system this engine has none of, layered onto unbuilt map regions. Proposed this scope-down via `AskUserQuestion` (the recommended option among three); the tool itself failed transiently on every retry, so proceeded with the recommended option and flagged the judgment call rather than blocking indefinitely on infrastructure noise |
+| 29 | `HERO_MISS`/`HERO_LIGHT_WOUND`/etc. in `combat.js` changed from flat string arrays to `(defenderName) => string[]` template-fillers | `HERO-MELEE` is one shared table in the source (an F-DEF placeholder gets filled with whichever villain you're fighting) - adding the thief as a second combatant using the hero's own attack flavor was the moment duplicating "the troll" into a parallel "the thief" copy of every line stopped being the simpler option |
 
 **Standing engineering practice throughout:** every UI/behavior change in this
 project has been verified by actually running the app (`npm run dev` +
@@ -117,8 +119,9 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 | Dam Lobby | S→Dam Room, N/E→Maintenance Room | `ONBIT` in source - naturally lit |
 | Maintenance Room (dark) | S/W→Dam Lobby | No `ONBIT` - genuinely dark, unlike its neighbors. Four clickable buttons (`push <color> button`): yellow primes the bolt (`gateFlag`), brown resets it, red toggles the room's own lights (flavor-only, not wired into the lighting engine), blue is permanently "jammed" (the source's leak/repair puzzle isn't modeled). Wrench (takeable) needed to `turn` the dam's bolt |
 | Dam Base | N/up→Dam Room | `ONBIT` in source. The Frigid River/boat/Atlantis Room network beyond isn't modeled |
+| Treasure Room (dark) | down→Cyclops Room | Now the thief's actual lair (see §1 decision 28): his LDESC is appended to the room text while he's alive (dropping out once defeated, same pattern as the Troll Room), real combat via `attack`/`kill thief` (`STRENGTH 5` - tougher than the troll's 2), and a real treasure (the chalice) that can't be taken until he's dead (`"You'd be stabbed in the back first."`, verbatim `CHALICE-FCN`) |
 
-### 2.4 Items implemented (11)
+### 2.4 Items implemented (13)
 - **leaflet** — starts in mailbox; readable ("WELCOME TO ZORK!..." — verbatim source text)
 - **lamp** (brass lantern) — Living Room; light source; `light lamp`/`turn off lamp` requires carrying it
 - **sword** (elvish, antique) — Living Room; takeable; no combat use yet
@@ -130,10 +133,12 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 - **leaves** — Grating Clearing; `move`/`take` reveals the grate underneath (canon's `burn`/`look under` triggers aren't modeled since this game has no `burn`/`look under` verb for anything yet, not just here)
 - **keys** ("key") — Maze-5, beside the skeleton; takeable, needed to `unlock` the grate from the Grating Room side
 - **wrench** — Maintenance Room; takeable, needed to `turn` the dam's bolt (bare hands don't work)
+- **guide** ("tour guidebook") — Dam Lobby; takeable, readable (verbatim "Flood Control Dam #3..." source text, including the Lord Dimwit Flathead joke)
+- **chalice** — Treasure Room; takeable (once the thief is defeated), a real treasure (value 10, tvalue 5); `put chalice in case` scores it
 
 ### 2.5 Verbs / commands
 - Movement: `north/south/east/west/up/down` (+ `n/s/e/w/u/d`), `in`/`enter`, `out`/`leave`; WASD + arrow keys
-- Objects: `open`, `close`, `take`/`get`, `drop`, `put <thing> in/on <container>` (trophy case only), `move`/`raise` (rug and leaves only), `push <color> button` (Maintenance Room only), `turn bolt` (Dam Room only, requires the wrench), `examine`/`x`, `read`, `attack`/`kill`/`hit`/`fight` (the troll only), `lock`/`unlock` (the grate only)
+- Objects: `open`, `close`, `take`/`get`, `drop`, `put <thing> in/on <container>` (trophy case only), `move`/`raise` (rug and leaves only), `push <color> button` (Maintenance Room only), `turn bolt` (Dam Room only, requires the wrench), `examine`/`x`, `read`, `attack`/`kill`/`hit`/`fight` (the troll or the thief - defaults to whichever is in the current room if no target is named), `lock`/`unlock` (the grate only)
 - Meta: `look`, `inventory`/`i`/`inv`, `help`, `score`, `light lamp`/`turn on lamp`, `turn off lamp`/`extinguish lamp`/`douse lamp`, `ulysses`/`odysseus` (deliberately not listed in `help` - it's a discoverable secret in canon too)
 - Click-to-interact on: mailbox, window, rug, trap door, lamp, sword, trophy case, troll, leaves, grate (both sides), skeleton key (hover shows an `<Html>` label; click fires the same handler as the equivalent typed verb). Depositing into the case, unlocking the grate, and the "ULYSSES" word are typed-only — the word puzzle has no object to click at all
 
@@ -151,6 +156,7 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 - `moves` counts one turn per action across nearly every verb, rather than exactly matching which specific verbs consume a turn in the original engine (`look`/`inventory`/`help`/`score` are free here, matching the original's own informational commands; finer-grained exceptions beyond that aren't modeled)
 - The dam area omits several real sub-puzzles: the `LOW-TIDE` reservoir-draining timer (Loud Room reads as permanently loud rather than cycling quiet/loud), the Loud Room's `ECHO`/platinum-bar puzzle, the blue button's leak/repair mechanic (permanently "jammed" instead), and the Reservoir/boat/Atlantis River network beyond Dam Base - all deferred as their own follow-up scope
 - The red button's room-lights toggle (Maintenance Room) is flavor text only, not wired into the `isDark`/`isUnderground` lighting engine - the room's actual visibility still depends solely on the carried lamp
+- The thief is a stationary Treasure Room guardian, not the source's per-turn roaming/stealing demon (`I-THIEF`) - he never leaves, never visits other rooms, and never steals anything from the player or the floor. His death doesn't deposit a "booty" pile or trigger the egg-safety mechanic (`EGG-SOLVE`) since there's nothing in his bag to deposit and egg fragility isn't modeled at all yet (see backlog #16). No stiletto item either - it's mentioned in his LDESC/combat text but isn't a takeable object once he's dead
 
 ---
 
@@ -172,7 +178,7 @@ room text or mechanics from memory.
 9. ~~**Cyclops Room / Strange Passage / Treasure Room**~~ — done. Saying `ulysses`/`odysseus` in the Cyclops Room scares him off, opening both the Treasure Room (up) and the Strange Passage shortcut straight to the Living Room (east) - the game's most famous shortcut. The Living Room's "nailed shut" door text now correctly swaps to the "cyclops-shaped opening" flavor once open, matching `LIVING-ROOM-FCN`. Treasure Room awards a real one-time 25-point discovery bonus (the room's own `VALUE`, not an item's). Only the word-puzzle solution is modeled, not the alternate lunch/water sleep path - see §2.6
 
 ### Requires a new subsystem
-10. **Thief NPC** — roams, steals/kills, guards the Treasure Room's real loot; also the natural time to add the cyclops's alternate lunch/water sleep solution (§2.6) alongside the LUNCH/WATER/BOTTLE items it needs
+10. ~~**Thief NPC**~~ — done, scoped down. He's a stationary guardian in the Treasure Room (real combat, `STRENGTH 5`, blocks the chalice until defeated) rather than the source's map-wide per-turn roaming/stealing demon - see §1 decision 28 and §2.6 for exactly what's deferred. A future pass could still add the cyclops's alternate lunch/water sleep solution (§2.6) alongside the LUNCH/WATER/BOTTLE items it needs, independent of the thief now
 11. **`diagnose` verb** — death/health stats; blocked on a death mechanic existing at all (#14). `score`/`moves` themselves are done (see §3 near-term #5)
 12. **Save/restore** — no persistence at all currently; page refresh loses all state
 13. **Light source depletion** — the lamp is a battery lantern with finite life in the original; currently it never runs out
@@ -248,7 +254,15 @@ in `rooms.js`), `CHASM-ROOM`, `LOUD-ROOM`/`LOUD-ROOM-FCN`, `DAMP-CAVE`,
 `RLANDBIT` only vs. `RLANDBIT ONBIT`) to get dark/lit status right;
 caught and fixed two rooms (`LOUD-ROOM`, `DEEP-CANYON`) that were
 missed as naturally lit on first pass but are actually dark like the
-rest of the hub (see §5).
+rest of the hub (see §5). Guidebook: `OBJECT GUIDE` (`1dungeon.zil`).
+Thief: `OBJECT THIEF`, `ROBBER-FUNCTION`, `I-THIEF`, `CHALICE-FCN`,
+`TREASURE-ROOM-FCN`, `THIEF-IN-TREASURE`, `HACK-TREASURES`,
+`DEPOSIT-BOOTY`, `OBJECT CHALICE`, `HERO-MELEE`/`THIEF-MELEE`/
+`VILLAINS` message tables (`1dungeon.zil`/`1actions.zil`) — read the
+full roaming/stealing/egg-safety machinery before deciding to scope it
+down to a stationary guardian (§1 decision 28); confirmed `HERO-MELEE`
+is genuinely one shared table across villains (`F-DEF` placeholder),
+not troll-specific as the existing `combat.js` had implicitly assumed.
 
 ---
 

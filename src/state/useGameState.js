@@ -13,6 +13,11 @@ import {
   TROLL_SERIOUS_WOUND,
   TROLL_DISARM,
   TROLL_STRENGTH,
+  THIEF_MISS,
+  THIEF_LIGHT_WOUND,
+  THIEF_SERIOUS_WOUND,
+  THIEF_DISARM,
+  THIEF_STRENGTH,
   PLAYER_MAX_HEALTH,
 } from '../gameData/combat';
 
@@ -81,11 +86,17 @@ export function useGameState() {
     gateFlag: false,
     gatesOpen: false,
     maintenanceLightsOn: false,
+    // The thief is a scoped-down "guardian" version of THIEF/I-THIEF: he
+    // always sits in the Treasure Room rather than roaming the whole map
+    // and stealing from other rooms (see PROJECT_STATUS.md).
+    thiefDefeated: false,
   });
-  // Combat is only relevant to the Troll Room right now, so this is
-  // simple top-level state rather than something threaded per-room.
+  // Combat is only relevant to the Troll Room/Treasure Room right now, so
+  // this is simple top-level state rather than something threaded per-room.
   const [trollHealth, setTrollHealth] = useState(TROLL_STRENGTH);
   const [trollDisarmed, setTrollDisarmed] = useState(false);
+  const [thiefHealth, setThiefHealth] = useState(THIEF_STRENGTH);
+  const [thiefDisarmed, setThiefDisarmed] = useState(false);
   const [playerHealth, setPlayerHealth] = useState(PLAYER_MAX_HEALTH);
   const [items, setItems] = useState(INITIAL_ITEMS);
   const [terminalLogs, setTerminalLogs] = useState([]);
@@ -385,6 +396,19 @@ export function useGameState() {
         }
         return;
       }
+      if (noun === 'thief') {
+        if (currentRoom === 'treasureRoom') {
+          log('Once you got him, what would you do with him?');
+        } else {
+          log("You can't see that here.");
+        }
+        return;
+      }
+      // CHALICE-FCN: the thief defends his hoard until defeated.
+      if (noun === 'chalice' && currentRoom === 'treasureRoom' && !flags.thiefDefeated) {
+        log("You'd be stabbed in the back first.");
+        return;
+      }
       const item = findItemByName(noun);
       if (!item || !isItemReachable(item)) {
         log("You can't see that here.");
@@ -422,7 +446,7 @@ export function useGameState() {
       }
       log('Taken.');
     },
-    [currentRoom, findItemByName, isItemReachable, flags.grateRevealed, log]
+    [currentRoom, findItemByName, isItemReachable, flags.grateRevealed, flags.thiefDefeated, log]
   );
 
   const dropItem = useCallback(
@@ -533,33 +557,33 @@ export function useGameState() {
       // Bare-handed: mostly misses, and even a "hit" is too weak to
       // matter - the game keeps nudging you toward finding the sword.
       if (roll < 0.7) {
-        log(randomPick(HERO_MISS));
+        log(randomPick(HERO_MISS('the troll')));
       } else {
-        log(randomPick(HERO_LIGHT_WOUND));
+        log(randomPick(HERO_LIGHT_WOUND('the troll')));
       }
       return counterBlow(true);
     }
 
     if (roll < 0.25) {
-      log(randomPick(HERO_MISS));
+      log(randomPick(HERO_MISS('the troll')));
       return counterBlow(true);
     }
     if (roll < 0.35 && !trollDisarmed) {
-      log(randomPick(HERO_DISARM));
+      log(randomPick(HERO_DISARM('the troll')));
       setTrollDisarmed(true);
       return counterBlow(false);
     }
     if (roll < 0.45) {
-      log(randomPick(HERO_STAGGER));
+      log(randomPick(HERO_STAGGER('the troll')));
       return counterBlow(false);
     }
 
     const damage = roll < 0.6 ? 2 : 1;
     const nextHealth = trollHealth - damage;
-    log(randomPick(damage === 2 ? HERO_SERIOUS_WOUND : HERO_LIGHT_WOUND));
+    log(randomPick(damage === 2 ? HERO_SERIOUS_WOUND('the troll') : HERO_LIGHT_WOUND('the troll')));
 
     if (nextHealth <= 0) {
-      log(randomPick(HERO_KILL));
+      log(randomPick(HERO_KILL('the troll')));
       setFlags((prev) => ({ ...prev, trollDefeated: true }));
       setTrollHealth(0);
       return;
@@ -595,6 +619,90 @@ export function useGameState() {
       }
     }
   }, [currentRoom, flags.trollDefeated, inventory, trollHealth, trollDisarmed, playerHealth, log, moveRoom]);
+
+  /**
+   * Same shape as attackTroll (one hero blow, then one thief counter-blow),
+   * just against the Treasure Room's guardian instead. The thief's higher
+   * STRENGTH (5 vs. the troll's 2) makes him a tougher fight, matching the
+   * source. Message text is verbatim from HERO-MELEE/THIEF-MELEE; the odds
+   * are the same simplified stand-in used for the troll (see combat.js).
+   * The source's roaming/stealing/egg-safety mechanics aren't modeled -
+   * this is a stationary guardian encounter only (see PROJECT_STATUS.md).
+   */
+  const attackThief = useCallback(() => {
+    if (currentRoom !== 'treasureRoom') {
+      log("You don't see that here.");
+      return;
+    }
+    if (flags.thiefDefeated) {
+      log("There's nothing here to fight.");
+      return;
+    }
+
+    const hasSword = inventory.includes('sword');
+    const roll = Math.random();
+
+    if (!hasSword) {
+      if (roll < 0.7) {
+        log(randomPick(HERO_MISS('the thief')));
+      } else {
+        log(randomPick(HERO_LIGHT_WOUND('the thief')));
+      }
+      return counterBlow(true);
+    }
+
+    if (roll < 0.25) {
+      log(randomPick(HERO_MISS('the thief')));
+      return counterBlow(true);
+    }
+    if (roll < 0.35 && !thiefDisarmed) {
+      log(randomPick(HERO_DISARM('the thief')));
+      setThiefDisarmed(true);
+      return counterBlow(false);
+    }
+    if (roll < 0.45) {
+      log(randomPick(HERO_STAGGER('the thief')));
+      return counterBlow(false);
+    }
+
+    const damage = roll < 0.6 ? 2 : 1;
+    const nextHealth = thiefHealth - damage;
+    log(randomPick(damage === 2 ? HERO_SERIOUS_WOUND('the thief') : HERO_LIGHT_WOUND('the thief')));
+
+    if (nextHealth <= 0) {
+      log(randomPick(HERO_KILL('the thief')));
+      setFlags((prev) => ({ ...prev, thiefDefeated: true }));
+      setThiefHealth(0);
+      return;
+    }
+    setThiefHealth(nextHealth);
+    counterBlow(true);
+
+    function counterBlow(canCounter) {
+      if (!canCounter || thiefDisarmed) return;
+      const villainRoll = Math.random();
+      if (villainRoll < 0.2) {
+        log(randomPick(THIEF_MISS));
+        return;
+      }
+      if (villainRoll < 0.3 && hasSword) {
+        log(randomPick(THIEF_DISARM));
+        setItems((prev) => ({ ...prev, sword: { ...prev.sword, location: 'treasureRoom' } }));
+        setInventory((prev) => prev.filter((id) => id !== 'sword'));
+        return;
+      }
+      const villainDamage = villainRoll < 0.45 ? 2 : 1;
+      log(randomPick(villainDamage === 2 ? THIEF_SERIOUS_WOUND : THIEF_LIGHT_WOUND));
+      const nextPlayerHealth = playerHealth - villainDamage;
+      if (nextPlayerHealth <= 0) {
+        log('Badly wounded, you stagger back down the staircase to the safety of the Cyclops Room.');
+        setPlayerHealth(PLAYER_MAX_HEALTH);
+        moveRoom('down');
+      } else {
+        setPlayerHealth(nextPlayerHealth);
+      }
+    }
+  }, [currentRoom, flags.thiefDefeated, inventory, thiefHealth, thiefDisarmed, playerHealth, log, moveRoom]);
 
   /**
    * The grate can only be unlocked/locked from the Grating Room side
@@ -798,6 +906,16 @@ export function useGameState() {
         }
         return;
       }
+      if (noun === 'thief' || noun === 'robber' || noun === 'man' || noun === 'person') {
+        if (currentRoom === 'treasureRoom' && !flags.thiefDefeated) {
+          log(
+            'The thief is a slippery character with beady eyes that flit back and forth. He carries, along with an unmistakable arrogance, a large bag over his shoulder and a vicious stiletto, whose blade is aimed menacingly in your direction. I\'d watch out if I were you.'
+          );
+        } else {
+          log("You don't see that here.");
+        }
+        return;
+      }
       const item = findItemByName(noun);
       if (item && isItemReachable(item)) {
         log(item.description);
@@ -813,6 +931,7 @@ export function useGameState() {
       flags.grateRevealed,
       flags.grateOpen,
       flags.grateUnlocked,
+      flags.thiefDefeated,
       describeMailbox,
       findItemByName,
       isItemReachable,
@@ -894,7 +1013,7 @@ export function useGameState() {
         case 'move': moveObject(objectName); break;
         case 'examine': examineObject(objectName); break;
         case 'read': readItem(objectName); break;
-        case 'attack': attackTroll(); break;
+        case 'attack': (objectName === 'thief' ? attackThief : attackTroll)(); break;
         case 'unlock': unlockGrate(); break;
         case 'lock': lockGrate(); break;
         case 'turn': turnBolt(); break;
@@ -911,6 +1030,7 @@ export function useGameState() {
       examineObject,
       readItem,
       attackTroll,
+      attackThief,
       unlockGrate,
       lockGrate,
       turnBolt,
@@ -1009,8 +1129,13 @@ export function useGameState() {
         case 'fight': {
           incrementMoves();
           const target = noun.replace(/\s+with\s+.*$/, '').trim();
-          if (!target || target === 'troll') {
+          const isThiefTarget = ['thief', 'robber', 'man', 'person'].includes(target);
+          if (!target) {
+            (currentRoom === 'treasureRoom' ? attackThief : attackTroll)();
+          } else if (target === 'troll') {
             attackTroll();
+          } else if (isThiefTarget) {
+            attackThief();
           } else if (target === 'cyclops' && currentRoom === 'cyclopsRoom' && !flags.cyclopsFled) {
             log('The cyclops shrugs but otherwise ignores your pitiful attempt.');
           } else {
@@ -1039,6 +1164,7 @@ export function useGameState() {
       examineObject,
       readItem,
       attackTroll,
+      attackThief,
       unlockGrate,
       lockGrate,
       sayUlysses,

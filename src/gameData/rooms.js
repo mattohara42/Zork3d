@@ -700,14 +700,22 @@ export const ROOMS = {
   // itself, not an item - see onEnter's scoreBonus in useGameState.
   // Bare of loot here since it's the thief's hideaway and there's no
   // thief NPC yet to have stashed anything.
+  // The thief's own LDESC is appended while he's alive, same pattern as
+  // the Troll Room - two separate objects auto-listed together in the
+  // source, not one hand-written paragraph. Only the "say ULYSSES"-era
+  // guardian version is modeled: no roaming, no stealing from other
+  // rooms, no egg-safety payout on death (see PROJECT_STATUS.md).
   treasureRoom: {
     id: 'treasureRoom',
     environment: 'underground',
     name: 'Treasure Room',
-    text:
+    text: (flags) =>
       'This is a large room, whose east wall is solid granite. A number ' +
       'of discarded bags, which crumble at your touch, are scattered ' +
-      'about on the floor. There is an exit down a staircase.',
+      'about on the floor. There is an exit down a staircase.' +
+      (flags.thiefDefeated
+        ? ''
+        : '\nThere is a suspicious-looking individual, holding a large bag, leaning against one wall. He is armed with a deadly stiletto.'),
     exits: { down: 'cyclopsRoom' },
     onEnter: (flags) =>
       flags.treasureRoomVisited ? null : { flagUpdates: { treasureRoomVisited: true }, scoreBonus: 25 },
