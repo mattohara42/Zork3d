@@ -6,6 +6,7 @@ import LanternLight from './primitives/LanternLight';
 
 const SKY_COLOR = '#87ceeb';
 const DARK_COLOR = '#000000';
+const FOG_COLOR = '#050505';
 const CAMERA_FOV = 60;
 
 /**
@@ -87,6 +88,10 @@ export default function ViewportCanvas({
         <FixedCameraRig />
         <SceneBackground color={backgroundColor} />
         <SceneLighting isDark={isDark} isUnderground={isUnderground} />
+        {/* Heavy near fog for dungeons only - snaps on/off with the room
+            like every other lighting change, no fade. Outdoors stays
+            fog-free; the daylight rig already reads as open-air. */}
+        {(isDark || isUnderground) && <fog attach="fog" args={[FOG_COLOR, 5, 15]} />}
         <SceneManager
           currentRoom={currentRoom}
           flags={flags}
