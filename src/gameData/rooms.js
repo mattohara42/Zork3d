@@ -8,8 +8,12 @@
 // door state), matching how LIVING-ROOM-FCN composes its description in
 // the original source rather than using a fixed string.
 //
-// exitGuards: a guard function returning a string blocks the move and
-// shows that message; returning null/undefined lets it through.
+// exitGuards: a guard function (flags, inventory) returning a string
+// blocks the move and shows that message. Returning null/undefined lets
+// it through with no side effect; returning an object with flagUpdates
+// lets it through *and* applies those updates (the up-chimney puzzle in
+// the Studio needs this - climbing out successfully also resets the
+// barred trap door).
 //
 // blockedExits: a direction with no real destination but a specific
 // "why not" message (the nailed-shut door, the unclimbable ramp) rather
@@ -54,8 +58,19 @@ export const ROOMS = {
   kitchen: {
     id: 'kitchen',
     name: 'Kitchen',
-    text: 'You are in the kitchen of the white house. A table seems to have been used recently for the preparation of food. A passage leads to the west, and to the east is a small window which is open.',
-    exits: { out: 'behindHouse', west: 'livingRoom' },
+    text: 'You are in the kitchen of the white house. A table seems to have been used recently for the preparation of food. A passage leads to the west, a dark staircase leads upward, and to the east is a small window which is open.',
+    exits: { out: 'behindHouse', west: 'livingRoom', up: 'attic', down: null },
+    // The chimney only ever works as a one-way shortcut back up from the
+    // Studio - going down from the Kitchen end is permanently blocked.
+    blockedExits: { down: 'Only Santa Claus climbs down chimneys.' },
+  },
+
+  attic: {
+    id: 'attic',
+    name: 'Attic',
+    text: 'This is the attic. The only exit is a stairway leading down.',
+    dark: true,
+    exits: { down: 'kitchen' },
   },
 
   livingRoom: {
@@ -91,9 +106,9 @@ export const ROOMS = {
   cellar: {
     id: 'cellar',
     name: 'Cellar',
-    text: 'You are in a dark and damp cellar, with a narrow passageway leading north. On the west is the bottom of a steep metal ramp which is unclimbable.',
+    text: 'You are in a dark and damp cellar, with a narrow passageway leading north, and a crawlway to the south. On the west is the bottom of a steep metal ramp which is unclimbable.',
     dark: true,
-    exits: { up: 'livingRoom', north: 'trollRoom', west: null },
+    exits: { up: 'livingRoom', north: 'trollRoom', south: 'eastOfChasm', west: null },
     blockedExits: {
       west: 'You try to ascend the ramp, but it is impossible, and you slide back down.',
     },
@@ -131,6 +146,52 @@ export const ROOMS = {
     blockedExits: {
       east: 'The troll fends you off with a menacing gesture.',
       west: 'The troll fends you off with a menacing gesture.',
+    },
+  },
+
+  eastOfChasm: {
+    id: 'eastOfChasm',
+    name: 'East of Chasm',
+    text: 'You are on the east edge of a chasm, the bottom of which cannot be seen. A narrow passage goes north, and the path you are on continues to the east.',
+    dark: true,
+    exits: { north: 'cellar', east: 'gallery', down: null },
+    blockedExits: {
+      down: 'The chasm probably leads straight to the infernal regions.',
+    },
+  },
+
+  gallery: {
+    id: 'gallery',
+    name: 'Gallery',
+    text: 'This is an art gallery. Most of the paintings have been stolen by vandals with exceptional taste. The vandals left through either the north or west exits.',
+    exits: { west: 'eastOfChasm', north: 'studio' },
+  },
+
+  studio: {
+    id: 'studio',
+    name: 'Studio',
+    text:
+      "This appears to have been an artist's studio. The walls and floors are " +
+      'splattered with paints of 69 different colors. Strangely enough, nothing ' +
+      'of value is hanging here. At the south end of the room is an open door ' +
+      '(also covered with paint). A dark and narrow chimney leads up from a ' +
+      'fireplace; although you might be able to get up it, it seems unlikely ' +
+      'you could get back down.',
+    dark: true,
+    exits: { south: 'gallery', up: 'kitchen' },
+    // Mirrors UP-CHIMNEY-FUNCTION exactly: climbing out requires the lamp
+    // and at most one other item. Succeeding also resets the barred trap
+    // door, since this is an alternate way back to the surface.
+    exitGuards: {
+      up: (flags, inventory) => {
+        if (inventory.length === 0) {
+          return 'Going up empty-handed is a bad idea.';
+        }
+        if (inventory.includes('lamp') && inventory.length <= 2) {
+          return { flagUpdates: { trapdoorBarred: false } };
+        }
+        return "You can't get up there with what you're carrying.";
+      },
     },
   },
 };

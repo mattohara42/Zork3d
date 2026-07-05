@@ -25,6 +25,7 @@ Update this file when a decision or the room/item map changes meaningfully.
 | 13 | `light lamp` requires the lamp to be **in inventory**, not just "reachable" | `isDark`/`isUnderground` is a single global boolean that travels with the player. Gating on "same room" would let the player light the lamp, walk away, and keep seeing in the dark despite leaving the actual lamp behind. Caught via live testing, not inspection |
 | 14 | `src/components/rooms/*.jsx` (no "Scene" suffix) + `src/components/primitives/*.jsx` | Explicit restructure request; component function names match filenames |
 | 15 | `RoomRegistry` object map replaces `SceneManager`'s switch statement | Adding a room is one registry entry + one component file, not a switch case to remember in a second place |
+| 16 | `exitGuards` can return `{ flagUpdates }` on success, not just a block string | Needed for the Studio's up-chimney puzzle: climbing out isn't just allowed/denied, succeeding also resets `trapdoorBarred` so the Cellar route reopens — matches the ZIL `UP-CHIMNEY-FUNCTION`'s side effect, not just a pass/fail check |
 
 **Standing engineering practice throughout:** every UI/behavior change in this
 project has been verified by actually running the app (`npm run dev` +
@@ -61,7 +62,7 @@ src/
 legacy-vanilla/index.html — superseded single-file prototype, kept for reference only
 ```
 
-### 2.3 Rooms implemented (8)
+### 2.3 Rooms implemented (12)
 
 | Room | Exits | Notable mechanics |
 |---|---|---|
@@ -69,15 +70,23 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 | North of House | S, E | Trees, decorative |
 | South of House | N, E | — |
 | Behind House | W, S, in→Kitchen (gated) | Window, starts "slightly ajar", `open window` required to enter |
-| Kitchen | out→Behind House, W→Living Room | Table (decorative) |
+| Kitchen | out→Behind House, W→Living Room, up→Attic, down(blocked: chimney) | Table (decorative); "Only Santa Claus climbs down chimneys" — chimney-down is a permanent dead end in canon, not a real path to the Studio |
+| Attic (dark) | down→Kitchen | Rope + knife (takeable); table (decorative, distinct text from Kitchen's) |
 | Living Room | E→Kitchen, W(blocked: nailed door), down→Cellar (gated) | Rug (`move rug` reveals trap door), trap door (open/close), trophy case (decorative), lamp + sword (takeable) |
-| Cellar (dark) | up→Living Room (gated, one-shot lock), N→Troll Room, W(blocked: ramp) | Trap door slams shut + bars on first descent; lantern-lit once lamp is lit and carried |
+| Cellar (dark) | up→Living Room (gated, one-shot lock), N→Troll Room, S→East of Chasm, W(blocked: ramp) | Trap door slams shut + bars on first descent; lantern-lit once lamp is lit and carried |
 | Troll Room (dark) | S→Cellar, E/W(blocked: troll, permanent) | Troll fixture, no combat system yet |
+| East of Chasm (dark) | N→Cellar, E→Gallery, down(blocked: chasm) | Bottomless chasm sunk into the floor ahead; pushed back from the camera so the lantern still lights visible ground when carried lit (see §5) |
+| Gallery | W→East of Chasm, N→Studio | Has `ONBIT` in source — the one underground room that's naturally lit, so it uses the normal daylight rig instead of dark/lantern; painting (takeable) |
+| Studio (dark) | S→Gallery, up→Kitchen (gated, inventory-limited) | Owner's manual (takeable, readable); up-chimney to Kitchen requires carrying the lamp + at most one other item, and succeeding also un-bars the Cellar's trap door (§1 decision 16) |
 
-### 2.4 Items implemented (3)
+### 2.4 Items implemented (7)
 - **leaflet** — starts in mailbox; readable ("WELCOME TO ZORK!..." — verbatim source text)
 - **lamp** (brass lantern) — Living Room; light source; `light lamp`/`turn off lamp` requires carrying it
 - **sword** (elvish, antique) — Living Room; takeable; no combat use yet
+- **rope** — Attic; takeable, no use yet (canonically used to descend the Chasm/well elsewhere in the dungeon, not built yet)
+- **knife** — Attic; takeable, no combat use yet
+- **painting** — Gallery; takeable (a real treasure in the original, but no trophy-case scoring subsystem yet — see §3)
+- **ownersManual** ("manual") — Studio; takeable, readable (verbatim "Congratulations!..." source text)
 
 ### 2.5 Verbs / commands
 - Movement: `north/south/east/west/up/down` (+ `n/s/e/w/u/d`), `in`/`enter`, `out`/`leave`; WASD + arrow keys
@@ -89,7 +98,8 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 - No synonym support — each object has exactly one recognized name (e.g. "mailbox", not "box"); consistent throughout, not per-object
 - No "raise rug" hint text before it's moved (source has a specific tease line here; skipped for scope)
 - Dropping a lit lamp in a room does **not** leave that room lit (real Zork: a dropped lit light source keeps illuminating its room). Our `hasLampLit` is a single player-relative boolean, not per-room state
-- Kitchen/Cellar/Troll Room text omits exits to unbuilt rooms (Attic, Studio, East-of-Chasm, Maze, etc.) rather than promising passages that don't work yet
+- Room text omits exits to still-unbuilt rooms (the Maze, Forest, etc.) rather than promising passages that don't work yet
+- Painting/rope/knife/manual have no gameplay function yet beyond take/examine/read — no trophy-case scoring, no rope-climbing mechanic, no combat
 
 ---
 
@@ -100,10 +110,10 @@ Roughly ordered by what unlocks the most, not strict priority. Pull from
 room text or mechanics from memory.
 
 ### Near-term (extends the existing map/mechanics with no new subsystems)
-1. **Attic** (Kitchen `up`) and **Studio** (Kitchen `down`, one-way via chimney) — small, self-contained, no new mechanics needed
+1. ~~**Attic** (Kitchen `up`) and **Studio**~~ — done. Turned out Kitchen's `down` (chimney) is a permanent dead end in canon, so Studio's only real entrance is Kitchen→...→Living Room→Cellar→East of Chasm→Gallery→Studio; built all four rooms on that path for real reachability (user-confirmed scope)
 2. **Forest rooms** around the house (`FOREST-1`, `FOREST-2`, `FOREST-3`, `PATH`, `UP-A-TREE`, etc.) — mostly flavor rooms, some contain items (the "up a tree" nest with the egg is a real early puzzle)
-3. **Trophy case scoring** — wire up `SETG SCORE` / treasue values now that the case exists as a fixture; needs a scoring concept in `useGameState` (`score`, `moves`) that doesn't exist yet
-4. **East-of-Chasm** (Cellar `south`) and the **Maze** (Troll Room `west`, once past the troll) — both reachable without combat, so don't strictly need #5 first
+3. **Trophy case scoring** — wire up `SETG SCORE` / treasure values now that the case exists as a fixture and there's a real treasure (painting) to deposit; needs a scoring concept in `useGameState` (`score`, `moves`) that doesn't exist yet
+4. **The Maze** (Troll Room `west`, once past the troll) — reachable without combat, so doesn't strictly need #5 first
 
 ### Requires a new subsystem
 5. **Combat system** — needed to ever get past the Troll Room's east/west exits (`TROLL-FLAG`). This is the single biggest gate blocking further underground progress (`EW-PASSAGE`, most of the dungeon). Real scope: a strength/damage model, the sword's "glowing" danger-proximity hint, flee/fight verbs
@@ -149,7 +159,8 @@ Related repos also seen during research, not currently needed:
 **Rooms/objects already cross-referenced against source:** West of House,
 North of House, South of House, Behind House (+ kitchen window), Kitchen,
 Living Room (+ rug, trap door, trophy case), Cellar, Troll Room (+ troll),
-mailbox + leaflet, lamp, sword.
+Attic, East of Chasm, Gallery, Studio, mailbox + leaflet, lamp, sword,
+rope, knife, painting, owner's manual.
 
 ---
 
@@ -163,6 +174,7 @@ they aren't repeated:
 - **`<color attach="background" args={[color]} />` didn't reliably update.** The declarative drei/R3F pattern silently kept the old background color despite state correctly changing. Caught by sampling actual rendered pixel RGB values (not eyeballing screenshots) and replaced with an imperative `scene.background = new Color(...)` in a `useEffect`.
 - **Trophy case / lamp / sword positioned outside the camera frustum.** Placed at `x=3.5` while only 2 units deep — the math for the camera's field of view at that depth put them entirely off-screen despite all game logic working. Caught because the take/examine text worked but the screenshot showed nothing there.
 - **`light lamp` didn't actually require possession** in its first pass — gated on "reachable" (same room OR inventory) instead of "carried", which let the player light it while it was still sitting on the trophy case.
+- **East of Chasm looked pitch black even with the lamp lit.** The chasm pit (intentionally pure-black geometry) sat right at the edge of the lantern's cone and filled almost the entire forward view, so a mechanically-correct "lit" room was visually indistinguishable from `isDark`. Caught by sampling pixel RGB values (all `(0,0,0)`) rather than trusting the screenshot at a glance; fixed by moving the pit further from the camera so there's visible lit ground in front of it.
 
 ---
 

@@ -38,4 +38,43 @@ export const INITIAL_ITEMS = {
     portable: true,
     location: 'livingRoom',
   },
+
+  rope: {
+    id: 'rope',
+    name: 'rope',
+    description: 'A large coil of rope.',
+    floorText: 'A large coil of rope is lying in the corner.',
+    portable: true,
+    location: 'attic',
+  },
+
+  knife: {
+    id: 'knife',
+    name: 'knife',
+    description: 'A nasty-looking knife.',
+    floorText: 'On a table is a nasty-looking knife.',
+    portable: true,
+    location: 'attic',
+  },
+
+  painting: {
+    id: 'painting',
+    name: 'painting',
+    description: 'A painting of unparalleled beauty, by a neglected genius.',
+    floorText:
+      'Fortunately, there is still one chance for you to be a vandal, for on the far wall is a painting of unparalleled beauty.',
+    portable: true,
+    location: 'gallery',
+  },
+
+  ownersManual: {
+    id: 'ownersManual',
+    name: 'manual',
+    description: "ZORK owner's manual.",
+    floorText: 'Loosely attached to a wall is a small piece of paper.',
+    readText:
+      'Congratulations!\n\nYou are the privileged owner of ZORK I: The Great Underground Empire, a self-contained and self-maintaining universe. If used and maintained in accordance with normal operating practices for small universes, ZORK will provide many months of trouble-free operation.',
+    portable: true,
+    location: 'studio',
+  },
 };

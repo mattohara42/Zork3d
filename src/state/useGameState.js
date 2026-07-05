@@ -95,14 +95,24 @@ export function useGameState() {
         log(blockedMessage || "You can't go that way.");
         return;
       }
+      // A guard's return value is a discriminated union: a string blocks
+      // the move and is shown as the reason; an object (or null/undefined)
+      // allows it, and if the object has flagUpdates they're applied as a
+      // side effect of a *successful* move (the up-chimney puzzle needs
+      // this: climbing out with the lamp and at most one other item
+      // succeeds, which also resets the barred trap door).
       const guard = room.exitGuards && room.exitGuards[direction];
-      const blockedMessage = guard && guard(flags);
-      if (blockedMessage) {
-        log(blockedMessage);
+      const guardResult = guard && guard(flags, inventory);
+      if (typeof guardResult === 'string') {
+        log(guardResult);
         return;
       }
 
       setCurrentRoom(targetId);
+
+      if (guardResult && guardResult.flagUpdates) {
+        setFlags((prev) => ({ ...prev, ...guardResult.flagUpdates }));
+      }
 
       const targetRoom = ROOMS[targetId];
       const enterResult = targetRoom.onEnter && targetRoom.onEnter(flags);
@@ -115,7 +125,7 @@ export function useGameState() {
         }
       }
     },
-    [room, flags, log]
+    [room, flags, inventory, log]
   );
 
   const openObject = useCallback(
@@ -324,10 +334,12 @@ export function useGameState() {
         return;
       }
       if (noun === 'table') {
-        if (currentRoom !== 'kitchen') {
-          log("You don't see that here.");
-        } else {
+        if (currentRoom === 'kitchen') {
           log('A table seems to have been used recently for the preparation of food.');
+        } else if (currentRoom === 'attic') {
+          log("There's nothing special about the table.");
+        } else {
+          log("You don't see that here.");
         }
         return;
       }
