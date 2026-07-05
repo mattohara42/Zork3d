@@ -67,6 +67,11 @@ export function useGameState() {
     grateRevealed: false,
     grateUnlocked: false,
     grateOpen: false,
+    // Covers both CYCLOPS-FLAG and MAGIC-FLAG from the source - we only
+    // implement the "say ULYSSES" solution (not the lunch/water sleep
+    // path), and that one word sets both at once, so one flag suffices.
+    cyclopsFled: false,
+    treasureRoomVisited: false,
   });
   // Combat is only relevant to the Troll Room right now, so this is
   // simple top-level state rather than something threaded per-room.
@@ -177,6 +182,12 @@ export function useGameState() {
         }
         if (enterResult.message) {
           log(enterResult.message);
+        }
+        // Some rooms carry their own one-time discovery bonus in the
+        // source (e.g. the Treasure Room's own VALUE 25) rather than an
+        // item's - scored the same way an item's first-take bonus is.
+        if (enterResult.scoreBonus) {
+          setBaseScore((s) => s + enterResult.scoreBonus);
         }
       }
 
@@ -600,6 +611,24 @@ export function useGameState() {
     log('The grate is locked.');
   }, [currentRoom, log]);
 
+  /**
+   * "ULYSSES"/"ODYSSEUS" is its own standalone command in the source
+   * (V-ODYSSEUS), not "say X" - matches its exact fallback line and the
+   * flee message verbatim. Only the word puzzle is modeled; the
+   * alternate lunch/water sleep solution isn't (see PROJECT_STATUS.md).
+   */
+  const sayUlysses = useCallback(() => {
+    if (currentRoom !== 'cyclopsRoom' || flags.cyclopsFled) {
+      log("Wasn't he a sailor?");
+      return;
+    }
+    setFlags((prev) => ({ ...prev, cyclopsFled: true }));
+    log(
+      "The cyclops, hearing the name of his father's deadly nemesis, flees " +
+        'the room by knocking down the wall on the east of the room.'
+    );
+  }, [currentRoom, flags.cyclopsFled, log]);
+
   const examineObject = useCallback(
     (noun) => {
       if (noun === 'mailbox') {
@@ -834,6 +863,11 @@ export function useGameState() {
         showScore();
         return;
       }
+      if (cmd === 'ulysses' || cmd === 'odysseus') {
+        incrementMoves();
+        sayUlysses();
+        return;
+      }
       if (LAMP_ON_COMMANDS.includes(cmd)) {
         incrementMoves();
         setLampLit(true);
@@ -886,6 +920,8 @@ export function useGameState() {
           const target = noun.replace(/\s+with\s+.*$/, '').trim();
           if (!target || target === 'troll') {
             attackTroll();
+          } else if (target === 'cyclops' && currentRoom === 'cyclopsRoom' && !flags.cyclopsFled) {
+            log('The cyclops shrugs but otherwise ignores your pitiful attempt.');
           } else {
             log("You can't attack that.");
           }
@@ -914,6 +950,9 @@ export function useGameState() {
       attackTroll,
       unlockGrate,
       lockGrate,
+      sayUlysses,
+      currentRoom,
+      flags.cyclopsFled,
       incrementMoves,
     ]
   );

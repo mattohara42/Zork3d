@@ -33,6 +33,8 @@ Update this file when a decision or the room/item map changes meaningfully.
 | 21 | The Maze's diagonal-only exits (no cardinal alternative) are remapped to whichever cardinal is free on that room, not dropped or faked | This engine only supports 6 directions; the maze leans on 8-directional movement as *part* of its disorientation. Redundant diagonals (duplicate a cardinal to the same room) are dropped, matching how the house ring already handles NE/SE; sole diagonals are remapped and documented per-room in `rooms.js`, then the whole graph was traced by hand and verified live edge-by-edge to confirm nothing became unreachable |
 | 22 | All 20 maze rooms share two components (`MazeRoom`/`MazeDeadEnd`) instead of one file each | The source's own joke is that they're indistinguishable ("all alike") - a per-room seed (hashed from the room id) varies rock placement just enough to not look like one frozen scene, without giving the player a real landmark, which would defeat the puzzle |
 | 23 | `open`/`close grate` work from either Grating Clearing or Grating Room once unlocked, but `lock`/`unlock` only work from Grating Room | Matches `GRATE-FUNCTION` exactly - it branches on `HERE` only for the lock verbs, not open/close. Modeled with the same room-data pattern already used elsewhere rather than a one-off special case |
+| 24 | Only the "ULYSSES" cyclops solution is built, not the source's alternate lunch/water sleep path | Both solutions unlock the Treasure Room, but only the word also breaks the wall to the Living Room shortcut - strictly the higher-value one to build first, and the alternate path needs its own items (`LUNCH`/`WATER`/`BOTTLE`) and a hunger-timer mechanic (`CYCLOWRATH`) better sequenced alongside the thief NPC |
+| 25 | Rooms can carry their own one-time score bonus via `onEnter`'s new `scoreBonus` field, awarded the same way an item's first-take `value` is | The Treasure Room has `VALUE 25` on the *room object* in the source, not an item - needed a small, generic extension rather than a one-off special case for this single room |
 
 **Standing engineering practice throughout:** every UI/behavior change in this
 project has been verified by actually running the app (`npm run dev` +
@@ -69,7 +71,7 @@ src/
 legacy-vanilla/index.html — superseded single-file prototype, kept for reference only
 ```
 
-### 2.3 Rooms implemented (44)
+### 2.3 Rooms implemented (47)
 
 | Room | Exits | Notable mechanics |
 |---|---|---|
@@ -79,7 +81,7 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 | Behind House | W, S, in→Kitchen (gated), E→Clearing | Window, starts "slightly ajar", `open window` required to enter |
 | Kitchen | out→Behind House, W→Living Room, up→Attic, down(blocked: chimney) | Table (decorative); "Only Santa Claus climbs down chimneys" — chimney-down is a permanent dead end in canon, not a real path to the Studio |
 | Attic (dark) | down→Kitchen | Rope + knife (takeable); table (decorative, distinct text from Kitchen's) |
-| Living Room | E→Kitchen, W(blocked: nailed door), down→Cellar (gated) | Rug (`move rug` reveals trap door), trap door (open/close), trophy case (decorative), lamp + sword (takeable) |
+| Living Room | E→Kitchen, W→Strange Passage (gated on "ULYSSES"), down→Cellar (gated) | Rug (`move rug` reveals trap door), trap door (open/close), trophy case (decorative), lamp + sword (takeable). The "nailed shut" door text swaps to a "cyclops-shaped opening" once the shortcut is open, matching `LIVING-ROOM-FCN` exactly |
 | Cellar (dark) | up→Living Room (gated, one-shot lock), N→Troll Room, S→East of Chasm, W(blocked: ramp) | Trap door slams shut + bars on first descent; lantern-lit once lamp is lit and carried |
 | Troll Room (dark) | S→Cellar, E(blocked, permanent for now - EW-Passage isn't built), W→Maze 1 (gated on defeating the troll) | Real combat via `attack`/`kill troll` (with or without the sword); winning removes the troll; losing bounces you to the Cellar (no death mechanic yet) |
 | East of Chasm (dark) | N→Cellar, E→Gallery, down(blocked: chasm) | Bottomless chasm sunk into the floor ahead; pushed back from the camera so the lantern still lights visible ground when carried lit (see §5) |
@@ -97,8 +99,11 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 | Rocky Ledge | up→Canyon View, down→Canyon Bottom | Midpoint of the climbable cliff |
 | Canyon Bottom | up→Rocky Ledge, N→End of Rainbow | River runoff strip across the floor |
 | End of Rainbow | S→Canyon Bottom | Canon's only exit is SW with no cardinal alt — mapped to S to avoid a dead end, since the other three exits (up/ne/east to the rainbow) all require a sceptre/rainbow puzzle not built yet; a rainbow arc renders east as pure flavor, not yet crossable. The invisible pot-of-gold treasure (only appears once the rainbow is solid) is deliberately not added as an item yet |
-| Maze 1-15, Dead End 1-4 (all dark) | See `rooms.js` for the full graph | Past the Troll Room's now-unblocked west exit. Every connection confirmed against `MAZE-DIODES`/each `ROOM`'s definition, including two deliberate self-loops (Maze-1 north, Maze-6/8/9/14 each have one) and the one-way "diode" passages (a warning logs before the move, e.g. Maze-9's `down`). About a third of the real connections are diagonal-only (no cardinal offered) - remapped to whichever cardinal was free on that room, documented per-room in `rooms.js`; traced the full graph afterward to confirm nothing became unreachable (verified live, every edge). All rooms share two visual components (`MazeRoom`/`MazeDeadEnd`) since the source's own joke is that they "all alike" - a tiny per-room seed varies rock placement without giving real navigational landmarks. Maze-5 has the skeleton (flavor only) and a real, takeable skeleton key. Maze-15's `east` (Cyclops Room) is deliberately left unbuilt - a separate puzzle chain |
+| Maze 1-15, Dead End 1-4 (all dark) | See `rooms.js` for the full graph | Past the Troll Room's now-unblocked west exit. Every connection confirmed against `MAZE-DIODES`/each `ROOM`'s definition, including two deliberate self-loops (Maze-1 north, Maze-6/8/9/14 each have one) and the one-way "diode" passages (a warning logs before the move, e.g. Maze-9's `down`). About a third of the real connections are diagonal-only (no cardinal offered) - remapped to whichever cardinal was free on that room, documented per-room in `rooms.js`; traced the full graph afterward to confirm nothing became unreachable (verified live, every edge). All rooms share two visual components (`MazeRoom`/`MazeDeadEnd`) since the source's own joke is that they "all alike" - a tiny per-room seed varies rock placement without giving real navigational landmarks. Maze-5 has the skeleton (flavor only) and a real, takeable skeleton key |
 | Grating Room (dark) | W→Maze 11, up→Grating Clearing (gated on the grate being open) | The one real second entrance/exit to the maze once solved: `unlock`/`lock` only work from here (needs the skeleton key), `open`/`close` work from either side once unlocked. Opening it before the surface leaves were ever disturbed reveals it from that side too, and the leaves themselves fall down here — mirrors `GRATE-FUNCTION` exactly |
+| Cyclops Room (dark) | W→Maze 15, E→Strange Passage (gated), up→Treasure Room (gated) | Both gated exits require saying `ULYSSES`/`ODYSSEUS` while the cyclops is present - the game's most famous shortcut. Only that word-puzzle solution is modeled, not the source's alternate lunch/water sleep path. Attacking gives the exact canon "shrugs off" response; the cyclops (`STRENGTH 10000`) isn't fightable |
+| Strange Passage (dark) | W/in→Cyclops Room, E→Living Room | Only reachable after the shortcut opens; the other end of the Living Room's west exit |
+| Treasure Room (dark) | down→Cyclops Room | The thief's hideaway - empty of loot since there's no thief NPC yet to stash anything. First visit awards a real one-time 25-point bonus (`VALUE 25` on the room itself in the source, not an item - see `onEnter`'s new `scoreBonus` field) |
 
 ### 2.4 Items implemented (10)
 - **leaflet** — starts in mailbox; readable ("WELCOME TO ZORK!..." — verbatim source text)
@@ -115,15 +120,16 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 ### 2.5 Verbs / commands
 - Movement: `north/south/east/west/up/down` (+ `n/s/e/w/u/d`), `in`/`enter`, `out`/`leave`; WASD + arrow keys
 - Objects: `open`, `close`, `take`/`get`, `drop`, `put <thing> in/on <container>` (trophy case only), `move`/`push`/`raise` (rug and leaves only), `examine`/`x`, `read`, `attack`/`kill`/`hit`/`fight` (the troll only), `lock`/`unlock` (the grate only)
-- Meta: `look`, `inventory`/`i`/`inv`, `help`, `score`, `light lamp`/`turn on lamp`, `turn off lamp`/`extinguish lamp`/`douse lamp`
-- Click-to-interact on: mailbox, window, rug, trap door, lamp, sword, trophy case, troll, leaves, grate (both sides), skeleton key (hover shows an `<Html>` label; click fires the same handler as the equivalent typed verb). Depositing into the case and unlocking the grate are typed-only — no click affordance for two-object verbs yet, but taking a deposited treasure/the key back out is a normal click like any other item
+- Meta: `look`, `inventory`/`i`/`inv`, `help`, `score`, `light lamp`/`turn on lamp`, `turn off lamp`/`extinguish lamp`/`douse lamp`, `ulysses`/`odysseus` (deliberately not listed in `help` - it's a discoverable secret in canon too)
+- Click-to-interact on: mailbox, window, rug, trap door, lamp, sword, trophy case, troll, leaves, grate (both sides), skeleton key (hover shows an `<Html>` label; click fires the same handler as the equivalent typed verb). Depositing into the case, unlocking the grate, and the "ULYSSES" word are typed-only — the word puzzle has no object to click at all
 
 ### 2.6 Known simplifications (deliberate, not bugs)
 - No synonym support — each object has exactly one recognized name (e.g. "mailbox", not "box"); consistent throughout, not per-object
 - No "raise rug" hint text before it's moved (source has a specific tease line here; skipped for scope)
 - Dropping a lit lamp in a room does **not** leave that room lit (real Zork: a dropped lit light source keeps illuminating its room). Our `hasLampLit` is a single player-relative boolean, not per-room state
-- Room text omits exits to still-unbuilt rooms (EW-Passage, the Cyclops Room, the dam area, etc.) rather than promising passages that don't work yet
+- Room text omits exits to still-unbuilt rooms (EW-Passage, the dam area, etc.) rather than promising passages that don't work yet
 - Leaves only reveal the grate via `move`/`take` (canon also allows `burn`/`look under`, but this game doesn't have those verbs for anything yet); `unlock`/`lock` ignore any noun/weapon phrase and just act on the grate, the only lockable thing in the game so far
+- The cyclops puzzle only implements the "ULYSSES" word solution, not the source's alternate lunch/water sleep path (`CYCLOWRATH`, the hunger timer, `LUNCH`/`WATER`/`BOTTLE` items) - both solutions unlock the Treasure Room in canon, but only the word also breaks the wall to the Living Room shortcut, so it was the higher-value one to build first
 - Rope/knife/manual have no gameplay function yet beyond take/examine/read — no rope-climbing mechanic
 - Egg has no fragility/condition mechanic (breaks if handled carelessly in the source) — plain take/examine/put only
 - Combat odds are a simplified fixed-probability stand-in for the source's strength-table lookup (§1 decision 19); losing a fight bounces you to the Cellar instead of a real death (§1 decision 20); the troll's disarmed state isn't reflected in the room's static text, only in the combat log itself
@@ -147,10 +153,10 @@ room text or mechanics from memory.
 6. ~~**The Maze**~~ (Troll Room `west`) — done. All 15 numbered rooms, 4 dead ends, and the Grating Room, wired exactly per `MAZE-DIODES`/each `ROOM` definition. *Correction*: earlier notes here said this was reachable without combat via the grate - re-reading `GRATE-FUNCTION` showed that's backwards, the grate can only be unlocked from *inside* the maze (a skeleton key found at Maze-5), so it's an exit shortcut you earn, not an entrance. The Troll Room really was the only way in
 7. ~~**Grate/leaf-clearing puzzle**~~ — done. `move`/`take leaves` at Grating Clearing reveals the grate; the skeleton key at Maze-5 unlocks it from the Grating Room side only (`unlock`/`lock` there, `open`/`close` from either side once unlocked) - a real second way in/out of the maze, verified live including the leaf-reveal-from-below case and both "wrong side" refusal messages
 8. ~~**Combat system**~~ — done. `attack`/`kill`/`hit`/`fight troll` (with or without the sword) in `useGameState`'s `attackTroll`; real `HERO-MELEE`/`TROLL-MELEE` flavor text (fetched from `gverbs.zil`/`1actions.zil`) over simplified fixed-odds resolution (§1 decisions 19-20). Winning sets `flags.trollDefeated`, removes the troll, and updates the room's blocked-exit messages; losing bounces the player to the Cellar rather than a real death, since there's no death/restart flow yet
-9. **Cyclops Room / Strange Passage / Treasure Room** (Maze-15 `east`) — needs a new "speak a word" verb mechanic (saying "ULYSSES"/"ODYSSEUS" scares the cyclops away and breaks a hole straight through to the Living Room - the game's most famous shortcut); Treasure Room is the thief's hideaway, better sequenced alongside the thief NPC
+9. ~~**Cyclops Room / Strange Passage / Treasure Room**~~ — done. Saying `ulysses`/`odysseus` in the Cyclops Room scares him off, opening both the Treasure Room (up) and the Strange Passage shortcut straight to the Living Room (east) - the game's most famous shortcut. The Living Room's "nailed shut" door text now correctly swaps to the "cyclops-shaped opening" flavor once open, matching `LIVING-ROOM-FCN`. Treasure Room awards a real one-time 25-point discovery bonus (the room's own `VALUE`, not an item's). Only the word-puzzle solution is modeled, not the alternate lunch/water sleep path - see §2.6
 
 ### Requires a new subsystem
-10. **NPCs beyond the troll** — thief (roams, steals/kills), cyclops (blocks a passage, solved by a spoken word not combat)
+10. **Thief NPC** — roams, steals/kills, guards the Treasure Room's real loot; also the natural time to add the cyclops's alternate lunch/water sleep solution (§2.6) alongside the LUNCH/WATER/BOTTLE items it needs
 11. **`diagnose` verb** — death/health stats; blocked on a death mechanic existing at all (#14). `score`/`moves` themselves are done (see §3 near-term #5)
 12. **Save/restore** — no persistence at all currently; page refresh loses all state
 13. **Light source depletion** — the lamp is a battery lantern with finite life in the original; currently it never runs out
@@ -210,7 +216,14 @@ grate is exit-only, not an entrance). Maze: `MAZE-1` through `MAZE-15`,
 to one of these. Grate puzzle: `LEAVES-APPEAR`/`LEAF-PILE`, `GRATE-FUNCTION`,
 `MAZE-11-FCN`, `CLEARING-FCN`, `OBJECT LEAVES`/`OBJECT KEYS`/`OBJECT GRATE`
 (`1dungeon.zil`/`1actions.zil`) — every message and state transition
-(`GRATE-REVEALED`/`GRUNLOCK`/open) traced back to these.
+(`GRATE-REVEALED`/`GRUNLOCK`/open) traced back to these. Cyclops:
+`CYCLOPS-FCN`, `CYCLOPS-ROOM-FCN`, `V-ODYSSEUS` (`gverbs.zil` - a
+trilogy-wide generic verb, not Zork I-specific), `OBJECT CYCLOPS`,
+`ROOM CYCLOPS-ROOM`/`STRANGE-PASSAGE`/`TREASURE-ROOM`
+(`1dungeon.zil`/`1actions.zil`). Also found (while tracing the Cyclops
+Room's west neighbor) that the Living Room's "nailed shut" door was
+never actually permanent in canon - `LIVING-ROOM-FCN`'s `MAGIC-FLAG`
+branch swaps its text for the cyclops-shaped-opening description.
 
 ---
 

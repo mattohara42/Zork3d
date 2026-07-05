@@ -86,15 +86,22 @@ export const ROOMS = {
     exits: { down: 'kitchen' },
   },
 
+  // West was a permanent "nailed shut" block until the Cyclops Room
+  // existed - LIVING-ROOM-FCN swaps that entire sentence for a
+  // "cyclops-shaped opening" once MAGIC-FLAG is set (saying "ULYSSES" to
+  // the cyclops), matching a real canon exit, not a fabricated shortcut.
   livingRoom: {
     id: 'livingRoom',
     environment: 'surface',
     name: 'Living Room',
     text: (flags) => {
-      let desc =
-        'You are in the living room. There is a doorway to the east, a wooden ' +
-        'door with strange gothic lettering to the west, which appears to be ' +
-        'nailed shut, a trophy case, and ';
+      let desc = 'You are in the living room. There is a doorway to the east, ';
+      desc += flags.cyclopsFled
+        ? 'a cyclops-shaped opening in an old wooden door to the west, above ' +
+          'which is some strange gothic lettering, '
+        : 'a wooden door with strange gothic lettering to the west, which ' +
+          'appears to be nailed shut, ';
+      desc += 'a trophy case, and ';
       if (flags.rugMoved && flags.trapdoorOpen) {
         desc += 'a rug lying beside an open trap door.';
       } else if (flags.rugMoved) {
@@ -106,9 +113,9 @@ export const ROOMS = {
       }
       return desc;
     },
-    exits: { east: 'kitchen', west: null, down: 'cellar' },
-    blockedExits: { west: 'The door is nailed shut.' },
+    exits: { east: 'kitchen', west: 'strangePassage', down: 'cellar' },
     exitGuards: {
+      west: (flags) => (flags.cyclopsFled ? null : 'The door is nailed shut.'),
       down: (flags) => {
         if (!flags.rugMoved) return "You can't go that way.";
         if (!flags.trapdoorOpen) return 'The trap door is closed.';
@@ -651,16 +658,65 @@ export const ROOMS = {
     exits: { west: 'maze15', north: 'maze14', south: 'maze7' },
   },
 
-  // SE (no cardinal alt, leads to the Cyclops Room) mapped to east -
-  // left unbuilt for now, a separate pass past its own puzzle chain
-  // (the cyclops, the "ULYSSES" wall-breaking shortcut to the Living
-  // Room, the Treasure Room).
+  // SE (no cardinal alt) mapped to east - leads to the Cyclops Room.
   maze15: {
     id: 'maze15',
     environment: 'underground',
     name: 'Maze',
     text: 'This is part of a maze of twisty little passages, all alike.',
     dark: true,
-    exits: { west: 'maze14', south: 'maze7', east: null },
+    exits: { west: 'maze14', south: 'maze7', east: 'cyclopsRoom' },
+  },
+
+  // NW (no cardinal alt) mapped to west, pairing with Maze-15's own
+  // east-to-here. `east` (real wall/passage to Strange Passage) and `up`
+  // (staircase to the Treasure Room) both require saying "ULYSSES" to
+  // the cyclops first - only that solution is modeled, not the
+  // alternate lunch/water sleep path from the source.
+  cyclopsRoom: {
+    id: 'cyclopsRoom',
+    environment: 'underground',
+    name: 'Cyclops Room',
+    text: (flags) =>
+      'This room has an exit on the northwest, and a staircase leading up.' +
+      (flags.cyclopsFled
+        ? ' The east wall, previously solid, now has a cyclops-sized opening in it.'
+        : ' A cyclops, who looks prepared to eat horses (much less mere ' +
+          'adventurers), blocks the staircase. From his state of health, ' +
+          'and the bloodstains on the walls, you gather that he is not ' +
+          'very friendly, though he likes people.'),
+    exits: { west: 'maze15', east: 'strangePassage', up: 'treasureRoom' },
+    exitGuards: {
+      east: (flags) => (flags.cyclopsFled ? null : 'The east wall is solid rock.'),
+      up: (flags) => (flags.cyclopsFled ? null : "The cyclops doesn't look like he'll let you past."),
+    },
+  },
+
+  strangePassage: {
+    id: 'strangePassage',
+    environment: 'underground',
+    name: 'Strange Passage',
+    text:
+      'This is a long passage. To the west is one entrance. On the east ' +
+      'there is an old wooden door, with a large opening in it (about ' +
+      'cyclops sized).',
+    exits: { west: 'cyclopsRoom', in: 'cyclopsRoom', east: 'livingRoom' },
+  },
+
+  // VALUE 25 in the source is a one-time discovery bonus for the room
+  // itself, not an item - see onEnter's scoreBonus in useGameState.
+  // Bare of loot here since it's the thief's hideaway and there's no
+  // thief NPC yet to have stashed anything.
+  treasureRoom: {
+    id: 'treasureRoom',
+    environment: 'underground',
+    name: 'Treasure Room',
+    text:
+      'This is a large room, whose east wall is solid granite. A number ' +
+      'of discarded bags, which crumble at your touch, are scattered ' +
+      'about on the floor. There is an exit down a staircase.',
+    exits: { down: 'cyclopsRoom' },
+    onEnter: (flags) =>
+      flags.treasureRoomVisited ? null : { flagUpdates: { treasureRoomVisited: true }, scoreBonus: 25 },
   },
 };

@@ -25,6 +25,9 @@ import EndOfRainbow from './EndOfRainbow';
 import MazeRoom from './MazeRoom';
 import MazeDeadEnd from './MazeDeadEnd';
 import GratingRoom from './GratingRoom';
+import CyclopsRoom from './CyclopsRoom';
+import StrangePassage from './StrangePassage';
+import TreasureRoom from './TreasureRoom';
 
 const MAZE_ROOM_IDS = [
   'maze1', 'maze2', 'maze3', 'maze4', 'maze5', 'maze6', 'maze7',
@@ -58,6 +61,9 @@ export const RoomRegistry = {
   canyonBottom: (props) => <CanyonBottom {...props} />,
   endOfRainbow: (props) => <EndOfRainbow {...props} />,
   gratingRoom: (props) => <GratingRoom {...props} />,
+  cyclopsRoom: (props) => <CyclopsRoom {...props} />,
+  strangePassage: (props) => <StrangePassage {...props} />,
+  treasureRoom: (props) => <TreasureRoom {...props} />,
   ...Object.fromEntries(
     MAZE_ROOM_IDS.map((id) => [id, (props) => <MazeRoom roomId={id} {...props} />])
   ),
