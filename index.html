@@ -668,7 +668,7 @@ function handleClose(noun) {
     } else {
       gameState.flags.window_open = false;
       rebuildCurrentRoomVisuals();
-      setMessage("You close the window.");
+      setMessage("The window closes (more easily than it opened).");
     }
     return;
   }
@@ -676,6 +676,10 @@ function handleClose(noun) {
 }
 
 function handleTake(noun) {
+  if (noun === 'mailbox') {
+    setMessage("It is securely anchored.");
+    return;
+  }
   const item = findItemByName(noun);
   if (!item || !isItemReachable(item)) {
     setMessage("You can't see that here.");
@@ -722,7 +726,7 @@ function handleExamine(noun) {
     } else {
       setMessage(gameState.flags.window_open
         ? "The window is open."
-        : "The window is slightly ajar.");
+        : "The window is slightly ajar, but not enough to allow entry.");
     }
     return;
   }
