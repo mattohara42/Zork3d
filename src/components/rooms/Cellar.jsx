@@ -9,7 +9,7 @@ const WALL_CENTER_Y = GROUND_Y + WALL_HEIGHT / 2;
 // deliberately plain - it reads as a shape caught by the spotlight rather
 // than something meant to be examined in bright daylight. No wall directly
 // ahead (-Z) - that's the narrow passageway leading north to the Troll Room.
-export default function CellarScene() {
+export default function Cellar() {
   return (
     <group>
       <Ground color="#3a3226" size={9} />

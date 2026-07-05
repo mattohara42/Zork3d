@@ -162,7 +162,7 @@ function TrapDoor({ rugMoved, open, onInteract }) {
   );
 }
 
-export default function LivingRoomScene({ flags, items, onInteract }) {
+export default function LivingRoom({ flags, items, onInteract }) {
   return (
     <group>
       <Ground color="#8b6b47" size={9} />

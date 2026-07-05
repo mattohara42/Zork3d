@@ -1,15 +1,15 @@
-import WestOfHouseScene from './scenes/WestOfHouseScene';
-import NorthOfHouseScene from './scenes/NorthOfHouseScene';
-import SouthOfHouseScene from './scenes/SouthOfHouseScene';
-import BehindHouseScene from './scenes/BehindHouseScene';
-import KitchenScene from './scenes/KitchenScene';
-import LivingRoomScene from './scenes/LivingRoomScene';
-import CellarScene from './scenes/CellarScene';
-import TrollRoomScene from './scenes/TrollRoomScene';
+import WestOfHouse from './rooms/WestOfHouse';
+import NorthOfHouse from './rooms/NorthOfHouse';
+import SouthOfHouse from './rooms/SouthOfHouse';
+import BehindHouse from './rooms/BehindHouse';
+import Kitchen from './rooms/Kitchen';
+import LivingRoom from './rooms/LivingRoom';
+import Cellar from './rooms/Cellar';
+import TrollRoom from './rooms/TrollRoom';
 
 /**
  * Dispatches on currentRoom and returns that room's primitives. Adding a
- * room is one case here plus a new scene component - React's own
+ * room is one case here plus a new room component - React's own
  * mount/unmount on the switched-out JSX does the "wipe old scene, build
  * new one" work the vanilla engine had to do by hand with
  * scene.remove()/geometry.dispose().
@@ -17,21 +17,21 @@ import TrollRoomScene from './scenes/TrollRoomScene';
 export default function SceneManager({ currentRoom, flags, items, onInteract }) {
   switch (currentRoom) {
     case 'westOfHouse':
-      return <WestOfHouseScene flags={flags} items={items} onInteract={onInteract} />;
+      return <WestOfHouse flags={flags} items={items} onInteract={onInteract} />;
     case 'northOfHouse':
-      return <NorthOfHouseScene />;
+      return <NorthOfHouse />;
     case 'southOfHouse':
-      return <SouthOfHouseScene />;
+      return <SouthOfHouse />;
     case 'behindHouse':
-      return <BehindHouseScene flags={flags} onInteract={onInteract} />;
+      return <BehindHouse flags={flags} onInteract={onInteract} />;
     case 'kitchen':
-      return <KitchenScene />;
+      return <Kitchen />;
     case 'livingRoom':
-      return <LivingRoomScene flags={flags} items={items} onInteract={onInteract} />;
+      return <LivingRoom flags={flags} items={items} onInteract={onInteract} />;
     case 'cellar':
-      return <CellarScene />;
+      return <Cellar />;
     case 'trollRoom':
-      return <TrollRoomScene />;
+      return <TrollRoom />;
     default:
       return null;
   }

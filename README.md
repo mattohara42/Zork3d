@@ -18,10 +18,12 @@ npm run dev
 - `src/state/useGameState.js` — the game engine: current room, inventory,
   flags, a scrolling narrative log, and every verb (movement, open/close,
   take/drop, examine, read, inventory, lamp toggle).
-- `src/components/` — `ViewportCanvas` (the R3F canvas + fixed isometric
-  camera), `SceneManager` (dispatches to a scene component per room),
-  `TextTerminal` (room text, log, direction buttons, command input), and
-  the individual room/primitive components.
+- `src/components/` — `ViewportCanvas` (the R3F canvas + fixed
+  first-person camera), `SceneManager` (dispatches to a room component
+  per room), `TextTerminal` (room text, log, direction buttons, command
+  input), `rooms/` (one component per room, e.g. `WestOfHouse.jsx`), and
+  `primitives/` (shared pieces reused across rooms - `Ground`,
+  `HouseShell`, `Mailbox`, etc.).
 
 Each room is a self-contained "stage": the camera never moves, and
 switching rooms just mounts a different scene component - there's no

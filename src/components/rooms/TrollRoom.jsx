@@ -35,7 +35,7 @@ function Troll() {
 // wall directly ahead (-Z) since that's where the troll itself is; the
 // side walls stand in for the blocked east/west passages and the
 // forbidding hole west.
-export default function TrollRoomScene() {
+export default function TrollRoom() {
   return (
     <group>
       <Ground color="#332e28" size={9} />

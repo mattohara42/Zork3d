@@ -2,7 +2,7 @@ import Ground, { GROUND_Y } from '../primitives/Ground';
 import HouseShell from '../primitives/HouseShell';
 import Tree from '../primitives/Tree';
 
-export default function NorthOfHouseScene() {
+export default function NorthOfHouse() {
   return (
     <group>
       <Ground color="#357a35" />

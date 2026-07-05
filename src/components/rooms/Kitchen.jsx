@@ -14,7 +14,7 @@ const LEG_POSITIONS = [
   [-1.95, -2.1],
 ];
 
-export default function KitchenScene() {
+export default function Kitchen() {
   return (
     <group>
       <Ground color="#c9a876" size={8} />
