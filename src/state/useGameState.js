@@ -124,8 +124,15 @@ export function useGameState() {
           log(enterResult.message);
         }
       }
+
+      // Environment switch: underground + no lantern lit is pitch black,
+      // regardless of any onEnter message above (e.g. the Cellar's trap
+      // door can slam shut *and* leave you blind in the same move).
+      if (targetRoom.environment === 'underground' && targetRoom.dark && !hasLampLit) {
+        log('It is pitch black. You are likely to be eaten by a grue.');
+      }
     },
-    [room, flags, inventory, log]
+    [room, flags, inventory, hasLampLit, log]
   );
 
   const openObject = useCallback(

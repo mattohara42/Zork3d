@@ -22,9 +22,17 @@
 // onEnter(flags): runs once after arriving in a room; can return
 // { message, flagUpdates } for one-shot effects like the trap door
 // slamming shut the first time you descend into the Cellar.
+//
+// environment: 'surface' | 'underground' - geography, not lighting.
+// The Gallery is 'underground' but has no `dark` flag (it's ONBIT in
+// the source, naturally lit) - EnvironmentLighting treats "not dark"
+// as the bright branch regardless of environment, so this stays a
+// correct exception rather than forcing every underground room
+// through the lantern-only path.
 export const ROOMS = {
   westOfHouse: {
     id: 'westOfHouse',
+    environment: 'surface',
     name: 'West of House',
     text: 'You are standing in an open field west of a white house, with a boarded front door. There is a small mailbox here.',
     exits: { north: 'northOfHouse', south: 'southOfHouse', east: null },
@@ -32,6 +40,7 @@ export const ROOMS = {
 
   northOfHouse: {
     id: 'northOfHouse',
+    environment: 'surface',
     name: 'North of House',
     text: 'You are facing the north side of a white house. There is no door here, and all the windows are boarded up. To the north a narrow path winds through the trees.',
     exits: { south: 'westOfHouse', east: 'behindHouse' },
@@ -39,6 +48,7 @@ export const ROOMS = {
 
   southOfHouse: {
     id: 'southOfHouse',
+    environment: 'surface',
     name: 'South of House',
     text: 'You are facing the south side of a white house. There is no door here, and all the windows are boarded.',
     exits: { north: 'westOfHouse', east: 'behindHouse' },
@@ -46,6 +56,7 @@ export const ROOMS = {
 
   behindHouse: {
     id: 'behindHouse',
+    environment: 'surface',
     name: 'Behind House',
     text: 'You are behind the white house. In one corner of the house there is a small window which is slightly ajar.',
     exits: { west: 'northOfHouse', south: 'southOfHouse', in: 'kitchen' },
@@ -57,6 +68,7 @@ export const ROOMS = {
 
   kitchen: {
     id: 'kitchen',
+    environment: 'surface',
     name: 'Kitchen',
     text: 'You are in the kitchen of the white house. A table seems to have been used recently for the preparation of food. A passage leads to the west, a dark staircase leads upward, and to the east is a small window which is open.',
     exits: { out: 'behindHouse', west: 'livingRoom', up: 'attic', down: null },
@@ -67,6 +79,7 @@ export const ROOMS = {
 
   attic: {
     id: 'attic',
+    environment: 'surface',
     name: 'Attic',
     text: 'This is the attic. The only exit is a stairway leading down.',
     dark: true,
@@ -75,6 +88,7 @@ export const ROOMS = {
 
   livingRoom: {
     id: 'livingRoom',
+    environment: 'surface',
     name: 'Living Room',
     text: (flags) => {
       let desc =
@@ -105,6 +119,7 @@ export const ROOMS = {
 
   cellar: {
     id: 'cellar',
+    environment: 'underground',
     name: 'Cellar',
     text: 'You are in a dark and damp cellar, with a narrow passageway leading north, and a crawlway to the south. On the west is the bottom of a steep metal ramp which is unclimbable.',
     dark: true,
@@ -130,6 +145,7 @@ export const ROOMS = {
 
   trollRoom: {
     id: 'trollRoom',
+    environment: 'underground',
     name: 'The Troll Room',
     // The room's own LDESC, plus the troll's LDESC - in the original
     // source these are two separate objects auto-listed together by the
@@ -151,6 +167,7 @@ export const ROOMS = {
 
   eastOfChasm: {
     id: 'eastOfChasm',
+    environment: 'underground',
     name: 'East of Chasm',
     text: 'You are on the east edge of a chasm, the bottom of which cannot be seen. A narrow passage goes north, and the path you are on continues to the east.',
     dark: true,
@@ -162,6 +179,7 @@ export const ROOMS = {
 
   gallery: {
     id: 'gallery',
+    environment: 'underground',
     name: 'Gallery',
     text: 'This is an art gallery. Most of the paintings have been stolen by vandals with exceptional taste. The vandals left through either the north or west exits.',
     exits: { west: 'eastOfChasm', north: 'studio' },
@@ -169,6 +187,7 @@ export const ROOMS = {
 
   studio: {
     id: 'studio',
+    environment: 'underground',
     name: 'Studio',
     text:
       "This appears to have been an artist's studio. The walls and floors are " +

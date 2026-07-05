@@ -10,11 +10,11 @@ export const HOUSE_Z = -10;
 export default function HouseShell() {
   return (
     <group>
-      <mesh position={[0, GROUND_Y + 2, HOUSE_Z]}>
+      <mesh castShadow position={[0, GROUND_Y + 2, HOUSE_Z]}>
         <boxGeometry args={[6, 4, 5]} />
         <meshStandardMaterial color="#ffffff" />
       </mesh>
-      <mesh position={[0, GROUND_Y + 5, HOUSE_Z]} rotation={[0, Math.PI / 4, 0]}>
+      <mesh castShadow position={[0, GROUND_Y + 5, HOUSE_Z]} rotation={[0, Math.PI / 4, 0]}>
         <coneGeometry args={[4.5, 2, 4]} />
         <meshStandardMaterial color="#8b4a3c" />
       </mesh>

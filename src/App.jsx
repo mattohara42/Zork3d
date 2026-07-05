@@ -13,6 +13,7 @@ export default function App() {
     isUnderground,
     flags,
     items,
+    hasLampLit,
     terminalLogs,
     moveRoom,
     interactWithObject,
@@ -37,6 +38,9 @@ export default function App() {
         items={items}
         isDark={isDark}
         isUnderground={isUnderground}
+        environment={room.environment}
+        naturallyLit={!room.dark}
+        lanternLit={hasLampLit}
         onInteract={interactWithObject}
       />
       <TextTerminal

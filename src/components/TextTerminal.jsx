@@ -56,26 +56,33 @@ export default function TextTerminal({ room, roomText, exits, isDark, terminalLo
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-        {DIRECTIONS.map((dir) => (
-          <button
-            key={dir}
-            onClick={() => onMove(dir)}
-            disabled={!exits[dir]}
-            style={{
-              background: exits[dir] ? 'rgba(20,40,20,0.8)' : 'rgba(20,40,20,0.3)',
-              border: '1px solid #4caf50',
-              color: exits[dir] ? '#d8f5d8' : '#5a7a5a',
-              fontFamily: 'inherit',
-              fontSize: 13,
-              padding: '6px 12px',
-              cursor: exits[dir] ? 'pointer' : 'default',
-              borderRadius: 3,
-              textTransform: 'capitalize',
-            }}
-          >
-            {dir}
-          </button>
-        ))}
+        {DIRECTIONS.map((dir) => {
+          // Blind in the dark: the clickable direction buttons go dark
+          // too, since you can't see where the exits are. Typed commands
+          // and WASD still work - moveRoom itself is never gated, only
+          // this UI convenience is.
+          const enabled = exits[dir] && !isDark;
+          return (
+            <button
+              key={dir}
+              onClick={() => onMove(dir)}
+              disabled={!enabled}
+              style={{
+                background: enabled ? 'rgba(20,40,20,0.8)' : 'rgba(20,40,20,0.3)',
+                border: '1px solid #4caf50',
+                color: enabled ? '#d8f5d8' : '#5a7a5a',
+                fontFamily: 'inherit',
+                fontSize: 13,
+                padding: '6px 12px',
+                cursor: enabled ? 'pointer' : 'default',
+                borderRadius: 3,
+                textTransform: 'capitalize',
+              }}
+            >
+              {dir}
+            </button>
+          );
+        })}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
           <input
