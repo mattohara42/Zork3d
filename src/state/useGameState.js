@@ -20,6 +20,16 @@ import {
   THIEF_STRENGTH,
   PLAYER_MAX_HEALTH,
 } from '../gameData/combat';
+import {
+  LAMP_DIM_1,
+  LAMP_DIM_2,
+  LAMP_NEARLY_OUT,
+  LAMP_BURNOUT,
+  LAMP_DIM_1_TEXT,
+  LAMP_DIM_2_TEXT,
+  LAMP_NEARLY_OUT_TEXT,
+  LAMP_BURNOUT_TEXT,
+} from '../gameData/lamp';
 
 const randomPick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -62,6 +72,10 @@ export function useGameState() {
   const [currentRoom, setCurrentRoom] = useState('westOfHouse');
   const [inventory, setInventory] = useState([]);
   const [hasLampLit, setHasLampLit] = useState(false);
+  // The battery lamp's life is finite (LAMP-TABLE) - see gameData/lamp.js.
+  // lampTurnsUsed only accumulates while the lamp is actually lit.
+  const [lampTurnsUsed, setLampTurnsUsed] = useState(0);
+  const [lampBurnedOut, setLampBurnedOut] = useState(false);
   const [flags, setFlags] = useState({
     mailboxOpen: false,
     windowOpen: false,
@@ -131,7 +145,20 @@ export function useGameState() {
     setTerminalLogs((prev) => [...prev, message]);
   }, []);
 
-  const incrementMoves = useCallback(() => setMoves((m) => m + 1), []);
+  const incrementMoves = useCallback(() => {
+    setMoves((m) => m + 1);
+    if (!hasLampLit || lampBurnedOut) return;
+    const next = lampTurnsUsed + 1;
+    setLampTurnsUsed(next);
+    if (next === LAMP_DIM_1) log(LAMP_DIM_1_TEXT);
+    else if (next === LAMP_DIM_2) log(LAMP_DIM_2_TEXT);
+    else if (next === LAMP_NEARLY_OUT) log(LAMP_NEARLY_OUT_TEXT);
+    else if (next === LAMP_BURNOUT) {
+      setHasLampLit(false);
+      setLampBurnedOut(true);
+      log(LAMP_BURNOUT_TEXT);
+    }
+  }, [hasLampLit, lampBurnedOut, lampTurnsUsed, log]);
 
   const isItemReachable = useCallback(
     (item) => {
@@ -906,6 +933,16 @@ export function useGameState() {
         }
         return;
       }
+      if (noun === 'lamp' || noun === 'lantern') {
+        if (!isItemReachable(items.lamp)) {
+          log("You don't see that here.");
+        } else if (lampBurnedOut) {
+          log('The lamp has burned out.');
+        } else {
+          log(`The lamp is ${hasLampLit ? 'on' : 'turned off'}.`);
+        }
+        return;
+      }
       if (noun === 'thief' || noun === 'robber' || noun === 'man' || noun === 'person') {
         if (currentRoom === 'treasureRoom' && !flags.thiefDefeated) {
           log(
@@ -932,6 +969,8 @@ export function useGameState() {
       flags.grateOpen,
       flags.grateUnlocked,
       flags.thiefDefeated,
+      lampBurnedOut,
+      hasLampLit,
       describeMailbox,
       findItemByName,
       isItemReachable,
@@ -995,10 +1034,14 @@ export function useGameState() {
         log("You don't have a lamp.");
         return;
       }
+      if (lampBurnedOut) {
+        log(lit ? "A burned-out lamp won't light." : 'The lamp has already burned out.');
+        return;
+      }
       setHasLampLit(lit);
       log(lit ? 'The lamp is now on.' : 'The lamp is now off.');
     },
-    [items.lamp, log]
+    [items.lamp, lampBurnedOut, log]
   );
 
   /** Generic dispatcher matching the requested hook shape. */

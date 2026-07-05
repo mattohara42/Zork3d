@@ -39,6 +39,7 @@ Update this file when a decision or the room/item map changes meaningfully.
 | 27 | Dam mechanics (`gateFlag`/`gatesOpen`) are two independent booleans, not one | `gateFlag` mirrors the green bubble's "primed" state (set/cleared by the yellow/brown buttons) and persists regardless of the gates themselves; `gatesOpen` mirrors `GATES-OPEN` and can only be toggled by `turn bolt` while primed. Matches the source's `BOLT-F`/`BUTTON-F` split exactly - priming and actuating are genuinely separate steps |
 | 28 | The thief is a stationary "guardian" NPC in the Treasure Room, not the source's map-wide roaming demon | `I-THIEF` ticks every turn and wanders the *entire* room graph (including areas not built yet - Temple, Egyptian Room, Hades, Atlantis), stealing treasures into his bag along the way; replicating that needs a per-turn background-event system this engine has none of, layered onto unbuilt map regions. Proposed this scope-down via `AskUserQuestion` (the recommended option among three); the tool itself failed transiently on every retry, so proceeded with the recommended option and flagged the judgment call rather than blocking indefinitely on infrastructure noise |
 | 29 | `HERO_MISS`/`HERO_LIGHT_WOUND`/etc. in `combat.js` changed from flat string arrays to `(defenderName) => string[]` template-fillers | `HERO-MELEE` is one shared table in the source (an F-DEF placeholder gets filled with whichever villain you're fighting) - adding the thief as a second combatant using the hero's own attack flavor was the moment duplicating "the troll" into a parallel "the thief" copy of every line stopped being the simpler option |
+| 30 | Lamp depletion is a plain incrementing counter (`lampTurnsUsed`), ticked once per player action while the lamp is lit, rather than the source's interrupt-queue-driven `I-LANTERN` demon | The source's exact turn-parity with other clocked events (candles, the thief) isn't reproducible without a shared scheduler this engine doesn't have; a counter checked against the same three verbatim `LAMP-TABLE` thresholds (100/170/185 cumulative lit-turns) produces the identical player-visible behavior for a single light source, which is what's actually being asked for |
 
 **Standing engineering practice throughout:** every UI/behavior change in this
 project has been verified by actually running the app (`npm run dev` +
@@ -61,6 +62,8 @@ src/
   gameData/
     rooms.js       — room dictionary (text, exits, exitGuards, blockedExits, onEnter, dark)
     items.js       — item dictionary (location, portable, floorText, description, readText)
+    combat.js      — verbatim HERO-MELEE/TROLL-MELEE/THIEF-MELEE flavor text
+    lamp.js        — verbatim LAMP-TABLE dimming thresholds/text
   state/
     useGameState.js       — the engine: state + every verb handler
     useKeyboardMovement.js — WASD/arrow-key movement
@@ -157,6 +160,7 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 - The dam area omits several real sub-puzzles: the `LOW-TIDE` reservoir-draining timer (Loud Room reads as permanently loud rather than cycling quiet/loud), the Loud Room's `ECHO`/platinum-bar puzzle, the blue button's leak/repair mechanic (permanently "jammed" instead), and the Reservoir/boat/Atlantis River network beyond Dam Base - all deferred as their own follow-up scope
 - The red button's room-lights toggle (Maintenance Room) is flavor text only, not wired into the `isDark`/`isUnderground` lighting engine - the room's actual visibility still depends solely on the carried lamp
 - The thief is a stationary Treasure Room guardian, not the source's per-turn roaming/stealing demon (`I-THIEF`) - he never leaves, never visits other rooms, and never steals anything from the player or the floor. His death doesn't deposit a "booty" pile or trigger the egg-safety mechanic (`EGG-SOLVE`) since there's nothing in his bag to deposit and egg fragility isn't modeled at all yet (see backlog #16). No stiletto item either - it's mentioned in his LDESC/combat text but isn't a takeable object once he's dead
+- Lamp depletion (`lampTurnsUsed`/`lampBurnedOut` in `useGameState`) ticks off real player actions, not the source's interrupt-queue turns, so it can drift a turn or two from a from-scratch playthrough of the original if you compare move-for-move - see §1 decision 30. Once burned out, the lamp is permanently dead (matches `RMUNGBIT` - no replacement battery/lamp exists to fix it, matching the source, which also never gives you a spare)
 
 ---
 
@@ -181,8 +185,8 @@ room text or mechanics from memory.
 10. ~~**Thief NPC**~~ — done, scoped down. He's a stationary guardian in the Treasure Room (real combat, `STRENGTH 5`, blocks the chalice until defeated) rather than the source's map-wide per-turn roaming/stealing demon - see §1 decision 28 and §2.6 for exactly what's deferred. A future pass could still add the cyclops's alternate lunch/water sleep solution (§2.6) alongside the LUNCH/WATER/BOTTLE items it needs, independent of the thief now
 11. **`diagnose` verb** — death/health stats; blocked on a death mechanic existing at all (#14). `score`/`moves` themselves are done (see §3 near-term #5)
 12. **Save/restore** — no persistence at all currently; page refresh loses all state
-13. **Light source depletion** — the lamp is a battery lantern with finite life in the original; currently it never runs out
-14. **Death mechanic** — "likely to be eaten by a grue" is flavor text only right now; there's no actual grue encounter or death/restart flow when lingering in the dark. Explicitly considered and declined once already: an instant Game Over the moment you *enter* any dark room without the lamp lit. Rejected because (a) the original never kills you on the first dark step — it warns, and only risks a probabilistic grue death if you keep acting while still in the dark, and (b) there's no Game Over screen/restart flow to land on yet. Build the real staged version here, not a shortcut bolted onto room transitions
+13. ~~**Light source depletion**~~ — done. The lamp's real `LAMP-TABLE` thresholds (100/170/185 turns lit, verbatim dimming text) are wired into `incrementMoves`; it burns out for good at 186 turns of cumulative lit-time, refuses to relight, and `examine lamp` reflects on/off/burned-out state. See §1 decision 30 and §2.6 for what's simplified (a plain counter instead of the source's interrupt-queue demon)
+14. **Death mechanic** — "likely to be eaten by a grue" is flavor text only right now; there's no actual grue encounter or death/restart flow when lingering in the dark. Explicitly considered and declined once already: an instant Game Over the moment you *enter* any dark room without the lamp lit. Rejected because (a) the original never kills you on the first dark step — it warns, and only risks a probabilistic grue death if you keep acting while still in the dark, and (b) there's no Game Over screen/restart flow to land on yet. Build the real staged version here, not a shortcut bolted onto room transitions. Now more pressing than before, since a burned-out lamp (#13) can strand a player in the dark with no way back to light
 15. **Rainbow/sceptre puzzle** — the sceptre (from the Egyptian Room, deep in the dungeon) waved on the rainbow makes it solid, opening On the Rainbow, Aragain Falls, and the pot-of-gold treasure. Blocked on reaching the sceptre's location first, so naturally sequenced after more of the underground is built
 16. **Egg fragility** — breaks if opened/dropped carelessly in the source (`EGG-OBJECT`, `BAD-EGG`), tied into the thief NPC being the only safe way to open it. Needs a simple "damaged" condition flag on the item plus thief NPC support (#10) to be worth building
 
@@ -263,6 +267,11 @@ full roaming/stealing/egg-safety machinery before deciding to scope it
 down to a stationary guardian (§1 decision 28); confirmed `HERO-MELEE`
 is genuinely one shared table across villains (`F-DEF` placeholder),
 not troll-specific as the existing `combat.js` had implicitly assumed.
+Lamp: `OBJECT LAMP`, `ROUTINE LANTERN`, `ROUTINE I-LANTERN`, `ROUTINE
+LIGHT-INT`, `GLOBAL LAMP-TABLE`, and the `<QUEUE I-LANTERN 200>`/table
+interval math in `GO` (`1dungeon.zil`/`1actions.zil`) - worked out the
+exact 100/170/185/186-turn schedule from the table's successive
+countdown intervals rather than assuming round numbers from memory.
 
 ---
 
