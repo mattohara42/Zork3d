@@ -149,19 +149,31 @@ export const ROOMS = {
     name: 'The Troll Room',
     // The room's own LDESC, plus the troll's LDESC - in the original
     // source these are two separate objects auto-listed together by the
-    // engine, not one hand-written paragraph.
-    text:
+    // engine, not one hand-written paragraph. Once defeated the troll's
+    // sentence drops out entirely, mirroring TROLL-FCN swapping the
+    // LDESC rather than us hand-writing a "troll is gone" replacement.
+    text: (flags) =>
       'This is a small room with passages to the east and south and a forbidding ' +
       'hole leading west. Bloodstains and deep scratches (perhaps made by an axe) ' +
-      'mar the walls.\nA nasty-looking troll, brandishing a bloody axe, blocks all ' +
-      'passages out of the room.',
+      'mar the walls.' +
+      (flags.trollDefeated
+        ? ''
+        : '\nA nasty-looking troll, brandishing a bloody axe, blocks all passages out of the room.'),
     dark: true,
+    // East (EW-Passage) and west (the Maze) both really do open once the
+    // troll is dealt with in canon - west is wired to the Maze once
+    // that's built; east stays unbuilt since EW-Passage and the rest of
+    // that side of the dungeon are a much larger separate pass.
     exits: { south: 'cellar', east: null, west: null },
-    // No combat system yet, so the troll is a permanent (for now)
-    // roadblock exactly like the original until you deal with it.
     blockedExits: {
-      east: 'The troll fends you off with a menacing gesture.',
-      west: 'The troll fends you off with a menacing gesture.',
+      east: (flags) =>
+        flags.trollDefeated
+          ? "The passage beyond hasn't been explored yet."
+          : 'The troll fends you off with a menacing gesture.',
+      west: (flags) =>
+        flags.trollDefeated
+          ? "The passage beyond hasn't been explored yet."
+          : 'The troll fends you off with a menacing gesture.',
     },
   },
 

@@ -1,6 +1,22 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ROOMS } from '../gameData/rooms';
 import { INITIAL_ITEMS } from '../gameData/items';
+import {
+  HERO_MISS,
+  HERO_LIGHT_WOUND,
+  HERO_SERIOUS_WOUND,
+  HERO_STAGGER,
+  HERO_DISARM,
+  HERO_KILL,
+  TROLL_MISS,
+  TROLL_LIGHT_WOUND,
+  TROLL_SERIOUS_WOUND,
+  TROLL_DISARM,
+  TROLL_STRENGTH,
+  PLAYER_MAX_HEALTH,
+} from '../gameData/combat';
+
+const randomPick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 const DIRECTION_ALIASES = {
   n: 'north', north: 'north',
@@ -19,8 +35,8 @@ const LAMP_OFF_COMMANDS = ['turn off lamp', 'extinguish lamp', 'douse lamp'];
 const HELP_TEXT =
   'Commands: north/south/east/west/up/down/in/out (or n/s/e/w/u/d), look, ' +
   'examine <thing>, open/close <thing>, take/drop <thing>, put <thing> in ' +
-  'case, read <thing>, move <thing>, inventory, score, light lamp / turn ' +
-  'off lamp.';
+  'case, read <thing>, move <thing>, attack/kill <thing>, inventory, ' +
+  'score, light lamp / turn off lamp.';
 
 function resolveRoomText(room, flags, items, currentRoom) {
   const base = typeof room.text === 'function' ? room.text(flags) : room.text;
@@ -47,7 +63,13 @@ export function useGameState() {
     rugMoved: false,
     trapdoorOpen: false,
     trapdoorBarred: false,
+    trollDefeated: false,
   });
+  // Combat is only relevant to the Troll Room right now, so this is
+  // simple top-level state rather than something threaded per-room.
+  const [trollHealth, setTrollHealth] = useState(TROLL_STRENGTH);
+  const [trollDisarmed, setTrollDisarmed] = useState(false);
+  const [playerHealth, setPlayerHealth] = useState(PLAYER_MAX_HEALTH);
   const [items, setItems] = useState(INITIAL_ITEMS);
   const [terminalLogs, setTerminalLogs] = useState([]);
   // baseScore accumulates one-time "first take" bonuses (a treasure's
@@ -115,7 +137,8 @@ export function useGameState() {
       incrementMoves();
       const targetId = room.exits[direction];
       if (!targetId) {
-        const blockedMessage = room.blockedExits && room.blockedExits[direction];
+        const blockedEntry = room.blockedExits && room.blockedExits[direction];
+        const blockedMessage = typeof blockedEntry === 'function' ? blockedEntry(flags) : blockedEntry;
         log(blockedMessage || "You can't go that way.");
         return;
       }
@@ -383,6 +406,94 @@ export function useGameState() {
     [currentRoom, flags.rugMoved, log]
   );
 
+  /**
+   * One player attack = one hero blow, then (if the troll survives,
+   * isn't staggered, and isn't disarmed) one troll counter-blow in the
+   * same turn - mirrors how a single "kill troll with sword" command
+   * resolves both sides of the exchange in the original. Message text
+   * is verbatim from the source's HERO-MELEE/TROLL-MELEE tables; the
+   * odds themselves are a simplified stand-in (see combat.js).
+   */
+  const attackTroll = useCallback(() => {
+    if (currentRoom !== 'trollRoom') {
+      log("You don't see that here.");
+      return;
+    }
+    if (flags.trollDefeated) {
+      log("There's nothing here to fight.");
+      return;
+    }
+
+    const hasSword = inventory.includes('sword');
+    const roll = Math.random();
+
+    if (!hasSword) {
+      // Bare-handed: mostly misses, and even a "hit" is too weak to
+      // matter - the game keeps nudging you toward finding the sword.
+      if (roll < 0.7) {
+        log(randomPick(HERO_MISS));
+      } else {
+        log(randomPick(HERO_LIGHT_WOUND));
+      }
+      return counterBlow(true);
+    }
+
+    if (roll < 0.25) {
+      log(randomPick(HERO_MISS));
+      return counterBlow(true);
+    }
+    if (roll < 0.35 && !trollDisarmed) {
+      log(randomPick(HERO_DISARM));
+      setTrollDisarmed(true);
+      return counterBlow(false);
+    }
+    if (roll < 0.45) {
+      log(randomPick(HERO_STAGGER));
+      return counterBlow(false);
+    }
+
+    const damage = roll < 0.6 ? 2 : 1;
+    const nextHealth = trollHealth - damage;
+    log(randomPick(damage === 2 ? HERO_SERIOUS_WOUND : HERO_LIGHT_WOUND));
+
+    if (nextHealth <= 0) {
+      log(randomPick(HERO_KILL));
+      setFlags((prev) => ({ ...prev, trollDefeated: true }));
+      setTrollHealth(0);
+      return;
+    }
+    setTrollHealth(nextHealth);
+    counterBlow(true);
+
+    function counterBlow(canCounter) {
+      if (!canCounter || trollDisarmed) return;
+      const villainRoll = Math.random();
+      if (villainRoll < 0.2) {
+        log(randomPick(TROLL_MISS));
+        return;
+      }
+      if (villainRoll < 0.3 && hasSword) {
+        log(randomPick(TROLL_DISARM));
+        setItems((prev) => ({ ...prev, sword: { ...prev.sword, location: 'trollRoom' } }));
+        setInventory((prev) => prev.filter((id) => id !== 'sword'));
+        return;
+      }
+      const villainDamage = villainRoll < 0.45 ? 2 : 1;
+      log(randomPick(villainDamage === 2 ? TROLL_SERIOUS_WOUND : TROLL_LIGHT_WOUND));
+      const nextPlayerHealth = playerHealth - villainDamage;
+      if (nextPlayerHealth <= 0) {
+        log('Badly wounded, you stagger back through the passage to the safety of the Cellar.');
+        setPlayerHealth(PLAYER_MAX_HEALTH);
+        // Goes through the normal south exit rather than a raw state
+        // set, so the Cellar's usual onEnter/pitch-black handling still
+        // applies exactly as if the player had walked there themselves.
+        moveRoom('south');
+      } else {
+        setPlayerHealth(nextPlayerHealth);
+      }
+    }
+  }, [currentRoom, flags.trollDefeated, inventory, trollHealth, trollDisarmed, playerHealth, log, moveRoom]);
+
   const examineObject = useCallback(
     (noun) => {
       if (noun === 'mailbox') {
@@ -541,10 +652,11 @@ export function useGameState() {
         case 'move': moveObject(objectName); break;
         case 'examine': examineObject(objectName); break;
         case 'read': readItem(objectName); break;
+        case 'attack': attackTroll(); break;
         default: log('Nothing happens.');
       }
     },
-    [openObject, closeObject, takeItem, dropItem, moveObject, examineObject, readItem, log, incrementMoves]
+    [openObject, closeObject, takeItem, dropItem, moveObject, examineObject, readItem, attackTroll, log, incrementMoves]
   );
 
   /** Parses a free-text command line, same verb set as the vanilla engine. */
@@ -617,6 +729,19 @@ export function useGameState() {
         case 'x':
         case 'look': incrementMoves(); examineObject(noun); break;
         case 'read': incrementMoves(); readItem(noun); break;
+        case 'attack':
+        case 'kill':
+        case 'hit':
+        case 'fight': {
+          incrementMoves();
+          const target = noun.replace(/\s+with\s+.*$/, '').trim();
+          if (!target || target === 'troll') {
+            attackTroll();
+          } else {
+            log("You can't attack that.");
+          }
+          break;
+        }
         default: log("I don't understand that command.");
       }
     },
@@ -635,6 +760,7 @@ export function useGameState() {
       moveObject,
       examineObject,
       readItem,
+      attackTroll,
       incrementMoves,
     ]
   );
@@ -654,6 +780,9 @@ export function useGameState() {
     hasLampLit,
     score,
     moves,
+    trollHealth,
+    trollDisarmed,
+    playerHealth,
     terminalLogs,
     moveRoom,
     interactWithObject,

@@ -28,6 +28,8 @@ Update this file when a decision or the room/item map changes meaningfully.
 | 16 | `exitGuards` can return `{ flagUpdates }` on success, not just a block string | Needed for the Studio's up-chimney puzzle: climbing out isn't just allowed/denied, succeeding also resets `trapdoorBarred` so the Cellar route reopens — matches the ZIL `UP-CHIMNEY-FUNCTION`'s side effect, not just a pass/fail check |
 | 17 | Trophy case score is **recomputed from scratch** off current case contents, not incremented/decremented by hand | Mirrors `TROPHY-CASE-FCN`'s own `SETG SCORE <+ BASE-SCORE (OTVAL-FROB)>` — taking a deposited treasure back out just naturally drops its points next render, no separate "undo the deposit bonus" code path to keep in sync |
 | 18 | `moves` increments once per player action across three call sites (`moveRoom`, `interactWithObject`, `runCommand`'s verb switch), not per keystroke or render | `enter`/`leave` route through `moveRoom`, which already counts its own turn, so `runCommand` deliberately does *not* double-count those two - every other verb branch counts its own |
+| 19 | Combat uses real HERO-MELEE/TROLL-MELEE flavor text, but simplified fixed-odds resolution instead of the source's strength-differential lookup tables | `DO-FIGHT`/`VILLAIN-BLOW`/`HERO-BLOW` resolve every blow through `DEF1-RES`/`DEF2-RES`/`DEF3-RES` tables keyed on a player "fight strength" that scales with score - replicating that exactly is a large, hard-to-verify undertaking disproportionate to the payoff; the actual combat *lines* the player reads are still verbatim source text, which is what the accuracy principle has always been about (facts and text, not internal RNG algorithms) |
+| 20 | Losing a fight bounces the player back to the Cellar rather than killing them | There's no death/restart flow built yet (see backlog #13) - a real "you die" here would be the same category of shortcut already rejected once for the dark-room instant-death proposal. The bounce-back still routes through the normal `south` exit so the Cellar's own onEnter/pitch-black handling applies exactly as if the player had walked there |
 
 **Standing engineering practice throughout:** every UI/behavior change in this
 project has been verified by actually running the app (`npm run dev` +
@@ -76,7 +78,7 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 | Attic (dark) | down→Kitchen | Rope + knife (takeable); table (decorative, distinct text from Kitchen's) |
 | Living Room | E→Kitchen, W(blocked: nailed door), down→Cellar (gated) | Rug (`move rug` reveals trap door), trap door (open/close), trophy case (decorative), lamp + sword (takeable) |
 | Cellar (dark) | up→Living Room (gated, one-shot lock), N→Troll Room, S→East of Chasm, W(blocked: ramp) | Trap door slams shut + bars on first descent; lantern-lit once lamp is lit and carried |
-| Troll Room (dark) | S→Cellar, E/W(blocked: troll, permanent) | Troll fixture, no combat system yet |
+| Troll Room (dark) | S→Cellar, E/W(blocked until troll defeated; E stays unbuilt after - EW-Passage isn't built yet) | Real combat via `attack`/`kill troll` (with or without the sword); winning removes the troll and unblocks W once the Maze exists; losing bounces you to the Cellar (no death mechanic yet) |
 | East of Chasm (dark) | N→Cellar, E→Gallery, down(blocked: chasm) | Bottomless chasm sunk into the floor ahead; pushed back from the camera so the lantern still lights visible ground when carried lit (see §5) |
 | Gallery | W→East of Chasm, N→Studio | Has `ONBIT` in source — the one underground room that's naturally lit, so it uses the normal daylight rig instead of dark/lantern; painting (takeable) |
 | Studio (dark) | S→Gallery, up→Kitchen (gated, inventory-limited) | Owner's manual (takeable, readable); up-chimney to Kitchen requires carrying the lamp + at most one other item, and succeeding also un-bars the Cellar's trap door (§1 decision 16) |
@@ -105,17 +107,18 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 
 ### 2.5 Verbs / commands
 - Movement: `north/south/east/west/up/down` (+ `n/s/e/w/u/d`), `in`/`enter`, `out`/`leave`; WASD + arrow keys
-- Objects: `open`, `close`, `take`/`get`, `drop`, `put <thing> in/on <container>` (trophy case only), `move`/`push`/`raise` (rug only), `examine`/`x`, `read`
+- Objects: `open`, `close`, `take`/`get`, `drop`, `put <thing> in/on <container>` (trophy case only), `move`/`push`/`raise` (rug only), `examine`/`x`, `read`, `attack`/`kill`/`hit`/`fight` (the troll only)
 - Meta: `look`, `inventory`/`i`/`inv`, `help`, `score`, `light lamp`/`turn on lamp`, `turn off lamp`/`extinguish lamp`/`douse lamp`
-- Click-to-interact on: mailbox, window, rug, trap door, lamp, sword, trophy case (hover shows an `<Html>` label; click fires the same handler as the equivalent typed verb). Depositing into the case is typed-only (`put egg in case`) — no click affordance for a two-object verb yet, but taking a deposited treasure back out is a normal click like any other item
+- Click-to-interact on: mailbox, window, rug, trap door, lamp, sword, trophy case, troll (hover shows an `<Html>` label; click fires the same handler as the equivalent typed verb). Depositing into the case is typed-only (`put egg in case`) — no click affordance for a two-object verb yet, but taking a deposited treasure back out is a normal click like any other item
 
 ### 2.6 Known simplifications (deliberate, not bugs)
 - No synonym support — each object has exactly one recognized name (e.g. "mailbox", not "box"); consistent throughout, not per-object
 - No "raise rug" hint text before it's moved (source has a specific tease line here; skipped for scope)
 - Dropping a lit lamp in a room does **not** leave that room lit (real Zork: a dropped lit light source keeps illuminating its room). Our `hasLampLit` is a single player-relative boolean, not per-room state
-- Room text omits exits to still-unbuilt rooms (the Maze, the dam area, etc.) rather than promising passages that don't work yet
-- Rope/knife/manual have no gameplay function yet beyond take/examine/read — no rope-climbing mechanic, no combat
+- Room text omits exits to still-unbuilt rooms (the Maze, EW-Passage, the dam area, etc.) rather than promising passages that don't work yet
+- Rope/knife/manual have no gameplay function yet beyond take/examine/read — no rope-climbing mechanic
 - Egg has no fragility/condition mechanic (breaks if handled carelessly in the source) — plain take/examine/put only
+- Combat odds are a simplified fixed-probability stand-in for the source's strength-table lookup (§1 decision 19); losing a fight bounces you to the Cellar instead of a real death (§1 decision 20); the troll's disarmed state isn't reflected in the room's static text, only in the combat log itself
 - `put` only understands the trophy case as a destination — there's no generic container system, since the case is the only real "put things in X" interaction in the game so far
 - `moves` counts one turn per action across nearly every verb, rather than exactly matching which specific verbs consume a turn in the original engine (`look`/`inventory`/`help`/`score` are free here, matching the original's own informational commands; finer-grained exceptions beyond that aren't modeled)
 
@@ -133,11 +136,11 @@ room text or mechanics from memory.
 3. ~~**Canyon View / Cliff Middle / Canyon Bottom / End of Rainbow**~~ (Clearing `east`) — done. The rainbow crossing (Aragain Falls, On the Rainbow, the invisible pot-of-gold treasure) needs the sceptre puzzle first — not built, left as a visible-but-uncrossable flavor rainbow rather than a fake exit
 4. **The dam area** (reservoir, dam room/lobby/base) — reachable a different way (via the river/Dam Room, not yet connected to anything we've built), holds its own multi-step puzzle (wrench + bolt to drain the reservoir); bigger than the pure-geography passes so far, scope it separately
 5. ~~**Trophy case scoring**~~ — done. `score`/`moves` state added to `useGameState`; `put <treasure> in case` deposits (typed-only, no click affordance yet), taking it back out un-scores it, `score` verb prints the verbatim V-SCORE text/rank thresholds. Fetched `gverbs.zil`/`gmain.zil` (not previously cached) to find `SCORE-UPD`/`BASE-SCORE`/`SCORE-OBJ`, since they're generic-engine routines, not in `1actions.zil`/`1dungeon.zil`
-6. **The Maze** (Troll Room `west`, once past the troll) — reachable without combat, so doesn't strictly need #7 first
-7. **Grate/leaf-clearing puzzle** (Grating Clearing `down`) — small, self-contained puzzle (find leaves, dig with a shovel to reveal the grate, then it's still locked from below until later); connects the forest to `MAZE-11`/the Maze from above once built
+6. **The Maze** (Troll Room `west`, now that combat exists) — *correction*: earlier notes here said this was reachable without combat via the grate. Re-reading `GRATE-FUNCTION` showed that's backwards - the grate can only be unlocked from *inside* the maze (`GRUNLOCK`, requires a skeleton key found at Maze-5), so it's an exit shortcut you earn, not an entrance. The Troll Room is genuinely the only way in. Now unblocked, this is next up.
+7. **Grate/leaf-clearing puzzle** (Grating Clearing `down`) — small, self-contained puzzle (find leaves, dig with a shovel to reveal the grate); note per #6, this only ever becomes a *second* way in/out once already inside the maze with the key, not a combat-free entrance
+8. ~~**Combat system**~~ — done. `attack`/`kill`/`hit`/`fight troll` (with or without the sword) in `useGameState`'s `attackTroll`; real `HERO-MELEE`/`TROLL-MELEE` flavor text (fetched from `gverbs.zil`/`1actions.zil`) over simplified fixed-odds resolution (§1 decisions 19-20). Winning sets `flags.trollDefeated`, removes the troll, and updates the room's blocked-exit messages; losing bounces the player to the Cellar rather than a real death, since there's no death/restart flow yet
 
 ### Requires a new subsystem
-8. **Combat system** — needed to ever get past the Troll Room's east/west exits (`TROLL-FLAG`). This is the single biggest gate blocking further underground progress (`EW-PASSAGE`, most of the dungeon). Real scope: a strength/damage model, the sword's "glowing" danger-proximity hint, flee/fight verbs
 9. **NPCs beyond the troll** — thief (roams, steals/kills), cyclops (blocks a passage, solved by a spoken word not combat)
 10. **`diagnose` verb** — death/health stats; blocked on a death mechanic existing at all (#13). `score`/`moves` themselves are done (see §3 near-term #5)
 11. **Save/restore** — no persistence at all currently; page refresh loses all state
@@ -188,7 +191,11 @@ Living Room (+ rug, trap door, trophy case), Cellar, Troll Room (+ troll),
 Attic, East of Chasm, Gallery, Studio, Forest 1/2/3, Mountains, Forest
 Path, Up a Tree (+ nest), Grating Clearing, Clearing, Canyon View, Rocky
 Ledge (Cliff Middle), Canyon Bottom, End of Rainbow, mailbox + leaflet,
-lamp, sword, rope, knife, painting, owner's manual, egg.
+lamp, sword, rope, knife, painting, owner's manual, egg. Combat:
+`DO-FIGHT`/`FIGHT-STRENGTH`/`VILLAIN-STRENGTH`/`VILLAIN-BLOW`/`HERO-BLOW`/
+`VILLAIN-RESULT` (`1actions.zil`), `HERO-MELEE`/`TROLL-MELEE` message
+tables (`1actions.zil`), `GRATE-FUNCTION`/`GRATING-ROOM` (confirmed the
+grate is exit-only, not an entrance).
 
 ---
 
