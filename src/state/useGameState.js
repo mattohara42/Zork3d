@@ -40,7 +40,12 @@ export function useGameState() {
   const [terminalLogs, setTerminalLogs] = useState([]);
 
   const room = ROOMS[currentRoom];
+  // isDark: a dark room with no light source - pitch black, can't see.
+  // isUnderground: a dark room WITH the lamp lit - visible, but by
+  // lantern-light rather than daylight, so the viewport should look and
+  // feel different even though the player can see.
   const isDark = !!room.dark && !hasLampLit;
+  const isUnderground = !!room.dark && hasLampLit;
 
   const log = useCallback((message) => {
     setTerminalLogs((prev) => [...prev, message]);
@@ -342,6 +347,7 @@ export function useGameState() {
     room,
     exits,
     isDark,
+    isUnderground,
     inventory,
     items,
     flags,
