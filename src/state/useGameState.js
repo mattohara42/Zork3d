@@ -34,9 +34,9 @@ const LAMP_OFF_COMMANDS = ['turn off lamp', 'extinguish lamp', 'douse lamp'];
 
 const HELP_TEXT =
   'Commands: north/south/east/west/up/down/in/out (or n/s/e/w/u/d), look, ' +
-  'examine <thing>, open/close <thing>, take/drop <thing>, put <thing> in ' +
-  'case, read <thing>, move <thing>, attack/kill <thing>, inventory, ' +
-  'score, light lamp / turn off lamp.';
+  'examine <thing>, open/close <thing>, lock/unlock <thing>, take/drop ' +
+  '<thing>, put <thing> in case, read <thing>, move <thing>, attack/kill ' +
+  '<thing>, inventory, score, light lamp / turn off lamp.';
 
 function resolveRoomText(room, flags, items, currentRoom) {
   const base = typeof room.text === 'function' ? room.text(flags) : room.text;
@@ -64,6 +64,9 @@ export function useGameState() {
     trapdoorOpen: false,
     trapdoorBarred: false,
     trollDefeated: false,
+    grateRevealed: false,
+    grateUnlocked: false,
+    grateOpen: false,
   });
   // Combat is only relevant to the Troll Room right now, so this is
   // simple top-level state rather than something threaded per-room.
@@ -226,9 +229,39 @@ export function useGameState() {
         }
         return;
       }
+      if (noun === 'grate' || noun === 'grating') {
+        if (currentRoom !== 'gratingClearing' && currentRoom !== 'gratingRoom') {
+          log("You don't see that here.");
+        } else if (!flags.grateUnlocked) {
+          log('The grating is locked.');
+        } else if (flags.grateOpen) {
+          log('It is already open.');
+        } else {
+          const updates = { grateOpen: true };
+          // Opening from either side reveals it on the other too -
+          // mirrors GRATE-FUNCTION's own leaf-drop when opened from
+          // below before the surface leaves were ever disturbed. The
+          // leaves themselves fall through to wherever the player
+          // currently is (MOVE LEAVES HERE in the source).
+          if (!flags.grateRevealed) {
+            updates.grateRevealed = true;
+            log('A pile of leaves falls onto your head and to the ground.');
+            if (items.leaves.location === 'gratingClearing') {
+              setItems((prev) => ({ ...prev, leaves: { ...prev.leaves, location: currentRoom } }));
+            }
+          }
+          setFlags((prev) => ({ ...prev, ...updates }));
+          log(
+            currentRoom === 'gratingRoom'
+              ? 'The grating opens to reveal trees above you.'
+              : 'The grating opens.'
+          );
+        }
+        return;
+      }
       log("You can't open that.");
     },
-    [currentRoom, flags, log]
+    [currentRoom, flags, items, log]
   );
 
   const closeObject = useCallback(
@@ -267,6 +300,17 @@ export function useGameState() {
           log('The door closes and locks.');
         } else {
           log("You don't see that here.");
+        }
+        return;
+      }
+      if (noun === 'grate' || noun === 'grating') {
+        if (currentRoom !== 'gratingClearing' && currentRoom !== 'gratingRoom') {
+          log("You don't see that here.");
+        } else if (!flags.grateOpen) {
+          log('It is already closed.');
+        } else {
+          setFlags((prev) => ({ ...prev, grateOpen: false }));
+          log('The grating is closed.');
         }
         return;
       }
@@ -334,9 +378,15 @@ export function useGameState() {
         },
       }));
       setInventory((prev) => [...prev, item.id]);
+      // Taking the leaves also reveals the grate underneath, same as
+      // moving them (LEAVES-APPEAR fires for either verb in the source).
+      if (item.id === 'leaves' && !flags.grateRevealed) {
+        setFlags((prev) => ({ ...prev, grateRevealed: true }));
+        log('In disturbing the pile of leaves, a grating is revealed.');
+      }
       log('Taken.');
     },
-    [currentRoom, findItemByName, isItemReachable, log]
+    [currentRoom, findItemByName, isItemReachable, flags.grateRevealed, log]
   );
 
   const dropItem = useCallback(
@@ -406,9 +456,20 @@ export function useGameState() {
         }
         return;
       }
+      if (noun === 'leaves' || noun === 'leaf' || noun === 'pile') {
+        if (currentRoom !== 'gratingClearing') {
+          log("You don't see that here.");
+        } else if (flags.grateRevealed) {
+          log('Done.');
+        } else {
+          setFlags((prev) => ({ ...prev, grateRevealed: true }));
+          log('With the leaves moved, a grating is revealed.');
+        }
+        return;
+      }
       log("You can't move that.");
     },
-    [currentRoom, flags.rugMoved, log]
+    [currentRoom, flags.rugMoved, flags.grateRevealed, log]
   );
 
   /**
@@ -499,6 +560,46 @@ export function useGameState() {
     }
   }, [currentRoom, flags.trollDefeated, inventory, trollHealth, trollDisarmed, playerHealth, log, moveRoom]);
 
+  /**
+   * The grate can only be unlocked/locked from the Grating Room side
+   * with the skeleton key from Maze-5 - matches GRATE-FUNCTION exactly,
+   * including the distinct "can't reach/lock from here" messages when
+   * tried from the Grating Clearing side above.
+   */
+  const unlockGrate = useCallback(() => {
+    if (currentRoom !== 'gratingRoom' && currentRoom !== 'gratingClearing') {
+      log("You don't see that here.");
+      return;
+    }
+    if (currentRoom === 'gratingClearing') {
+      log("You can't reach the lock from here.");
+      return;
+    }
+    if (!inventory.includes('keys')) {
+      log("You don't have the skeleton key.");
+      return;
+    }
+    if (flags.grateUnlocked) {
+      log('It is already unlocked.');
+      return;
+    }
+    setFlags((prev) => ({ ...prev, grateUnlocked: true }));
+    log('The grate is unlocked.');
+  }, [currentRoom, inventory, flags.grateUnlocked, log]);
+
+  const lockGrate = useCallback(() => {
+    if (currentRoom !== 'gratingRoom' && currentRoom !== 'gratingClearing') {
+      log("You don't see that here.");
+      return;
+    }
+    if (currentRoom === 'gratingClearing') {
+      log("You can't lock it from this side.");
+      return;
+    }
+    setFlags((prev) => ({ ...prev, grateUnlocked: false }));
+    log('The grate is locked.');
+  }, [currentRoom, log]);
+
   const examineObject = useCallback(
     (noun) => {
       if (noun === 'mailbox') {
@@ -518,6 +619,21 @@ export function useGameState() {
               ? 'The window is open.'
               : 'The window is slightly ajar, but not enough to allow entry.'
           );
+        }
+        return;
+      }
+      if (noun === 'grate' || noun === 'grating') {
+        if (
+          (currentRoom !== 'gratingClearing' && currentRoom !== 'gratingRoom') ||
+          !flags.grateRevealed
+        ) {
+          log("You don't see that here.");
+        } else if (flags.grateOpen) {
+          log('The grating is open.');
+        } else if (flags.grateUnlocked) {
+          log('The grating is closed but unlocked.');
+        } else {
+          log('The grating is locked with a skull-and-crossbones lock.');
         }
         return;
       }
@@ -581,7 +697,20 @@ export function useGameState() {
       }
       log("You don't see that here.");
     },
-    [currentRoom, flags.windowOpen, flags.rugMoved, flags.trapdoorOpen, describeMailbox, findItemByName, isItemReachable, items, log]
+    [
+      currentRoom,
+      flags.windowOpen,
+      flags.rugMoved,
+      flags.trapdoorOpen,
+      flags.grateRevealed,
+      flags.grateOpen,
+      flags.grateUnlocked,
+      describeMailbox,
+      findItemByName,
+      isItemReachable,
+      items,
+      log,
+    ]
   );
 
   const readItem = useCallback(
@@ -658,10 +787,25 @@ export function useGameState() {
         case 'examine': examineObject(objectName); break;
         case 'read': readItem(objectName); break;
         case 'attack': attackTroll(); break;
+        case 'unlock': unlockGrate(); break;
+        case 'lock': lockGrate(); break;
         default: log('Nothing happens.');
       }
     },
-    [openObject, closeObject, takeItem, dropItem, moveObject, examineObject, readItem, attackTroll, log, incrementMoves]
+    [
+      openObject,
+      closeObject,
+      takeItem,
+      dropItem,
+      moveObject,
+      examineObject,
+      readItem,
+      attackTroll,
+      unlockGrate,
+      lockGrate,
+      log,
+      incrementMoves,
+    ]
   );
 
   /** Parses a free-text command line, same verb set as the vanilla engine. */
@@ -747,6 +891,8 @@ export function useGameState() {
           }
           break;
         }
+        case 'unlock': incrementMoves(); unlockGrate(); break;
+        case 'lock': incrementMoves(); lockGrate(); break;
         default: log("I don't understand that command.");
       }
     },
@@ -766,6 +912,8 @@ export function useGameState() {
       examineObject,
       readItem,
       attackTroll,
+      unlockGrate,
+      lockGrate,
       incrementMoves,
     ]
   );

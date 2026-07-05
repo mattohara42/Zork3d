@@ -32,6 +32,7 @@ Update this file when a decision or the room/item map changes meaningfully.
 | 20 | Losing a fight bounces the player back to the Cellar rather than killing them | There's no death/restart flow built yet (see backlog #13) - a real "you die" here would be the same category of shortcut already rejected once for the dark-room instant-death proposal. The bounce-back still routes through the normal `south` exit so the Cellar's own onEnter/pitch-black handling applies exactly as if the player had walked there |
 | 21 | The Maze's diagonal-only exits (no cardinal alternative) are remapped to whichever cardinal is free on that room, not dropped or faked | This engine only supports 6 directions; the maze leans on 8-directional movement as *part* of its disorientation. Redundant diagonals (duplicate a cardinal to the same room) are dropped, matching how the house ring already handles NE/SE; sole diagonals are remapped and documented per-room in `rooms.js`, then the whole graph was traced by hand and verified live edge-by-edge to confirm nothing became unreachable |
 | 22 | All 20 maze rooms share two components (`MazeRoom`/`MazeDeadEnd`) instead of one file each | The source's own joke is that they're indistinguishable ("all alike") - a per-room seed (hashed from the room id) varies rock placement just enough to not look like one frozen scene, without giving the player a real landmark, which would defeat the puzzle |
+| 23 | `open`/`close grate` work from either Grating Clearing or Grating Room once unlocked, but `lock`/`unlock` only work from Grating Room | Matches `GRATE-FUNCTION` exactly - it branches on `HERE` only for the lock verbs, not open/close. Modeled with the same room-data pattern already used elsewhere rather than a one-off special case |
 
 **Standing engineering practice throughout:** every UI/behavior change in this
 project has been verified by actually running the app (`npm run dev` +
@@ -90,15 +91,16 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 | Mountains | N/S/W→Forest 2, E/up(blocked: impassable) | Flavor dead end; all three "back" directions lead to the same room, matching canon exactly rather than collapsing to one exit |
 | Forest Path | up→Up a Tree, N→Grating Clearing, E→Forest 2, S→North of House, W→Forest 1 | The climbable tree lives here |
 | Up a Tree | down→Path, up(blocked: can't climb higher) | No `Ground` — a branch platform stands in for the floor plane, surrounded by leaf-cluster meshes instead of grass/sky; bird's nest + egg (takeable) |
-| Clearing (grating) | E→Forest 2, W→Forest 1, S→Path, N(blocked), down(blocked — grate not revealed) | Grate/leaf-clearing puzzle not built yet; `down` is a real canon exit gated behind a puzzle we haven't implemented, not a fabricated permanent block |
+| Clearing (grating) | E→Forest 2, W→Forest 1, S→Path, N(blocked), down→Grating Room (gated on the grate being open) | Pile of leaves (move/take reveals the grate); once revealed the grate itself is clickable/typeable (`open`/`close`), but lock/unlock only work from the Grating Room side below |
 | Clearing (plain) | N→Forest 2, S→Forest 3, W→Behind House, E→Canyon View | Same displayed name ("Clearing") as the grating one, matching canon — two distinct rooms, same DESC, different LDESC/exits |
 | Canyon View | N→Clearing, E/down→Cliff Middle, W→Forest 3 (one-way), S(blocked: storm) | Canon's NW-to-Clearing is diagonal-only with no cardinal alternative, mapped to N since W is taken by Forest 3; Forest 3 has no exit back here, matching canon's own asymmetry |
 | Rocky Ledge | up→Canyon View, down→Canyon Bottom | Midpoint of the climbable cliff |
 | Canyon Bottom | up→Rocky Ledge, N→End of Rainbow | River runoff strip across the floor |
 | End of Rainbow | S→Canyon Bottom | Canon's only exit is SW with no cardinal alt — mapped to S to avoid a dead end, since the other three exits (up/ne/east to the rainbow) all require a sceptre/rainbow puzzle not built yet; a rainbow arc renders east as pure flavor, not yet crossable. The invisible pot-of-gold treasure (only appears once the rainbow is solid) is deliberately not added as an item yet |
-| Maze 1-15, Dead End 1-4, Grating Room (all dark) | See `rooms.js` for the full graph | Past the Troll Room's now-unblocked west exit. Every connection confirmed against `MAZE-DIODES`/each `ROOM`'s definition, including two deliberate self-loops (Maze-1 north, Maze-6/8/9/14 each have one) and the one-way "diode" passages (a warning logs before the move, e.g. Maze-9's `down`). About a third of the real connections are diagonal-only (no cardinal offered) - remapped to whichever cardinal was free on that room, documented per-room in `rooms.js`; traced the full graph afterward to confirm nothing became unreachable (verified live, every edge). All 20 rooms share two visual components (`MazeRoom`/`MazeDeadEnd`) since the source's own joke is that they "all alike" - a tiny per-room seed varies rock placement without giving real navigational landmarks. Maze-15's `east` (Cyclops Room) and Grating Room's `up` (needs a skeleton key from Maze-5) are both deliberately left unbuilt - separate puzzle chains, not part of this pass |
+| Maze 1-15, Dead End 1-4 (all dark) | See `rooms.js` for the full graph | Past the Troll Room's now-unblocked west exit. Every connection confirmed against `MAZE-DIODES`/each `ROOM`'s definition, including two deliberate self-loops (Maze-1 north, Maze-6/8/9/14 each have one) and the one-way "diode" passages (a warning logs before the move, e.g. Maze-9's `down`). About a third of the real connections are diagonal-only (no cardinal offered) - remapped to whichever cardinal was free on that room, documented per-room in `rooms.js`; traced the full graph afterward to confirm nothing became unreachable (verified live, every edge). All rooms share two visual components (`MazeRoom`/`MazeDeadEnd`) since the source's own joke is that they "all alike" - a tiny per-room seed varies rock placement without giving real navigational landmarks. Maze-5 has the skeleton (flavor only) and a real, takeable skeleton key. Maze-15's `east` (Cyclops Room) is deliberately left unbuilt - a separate puzzle chain |
+| Grating Room (dark) | W→Maze 11, up→Grating Clearing (gated on the grate being open) | The one real second entrance/exit to the maze once solved: `unlock`/`lock` only work from here (needs the skeleton key), `open`/`close` work from either side once unlocked. Opening it before the surface leaves were ever disturbed reveals it from that side too, and the leaves themselves fall down here — mirrors `GRATE-FUNCTION` exactly |
 
-### 2.4 Items implemented (8)
+### 2.4 Items implemented (10)
 - **leaflet** — starts in mailbox; readable ("WELCOME TO ZORK!..." — verbatim source text)
 - **lamp** (brass lantern) — Living Room; light source; `light lamp`/`turn off lamp` requires carrying it
 - **sword** (elvish, antique) — Living Room; takeable; no combat use yet
@@ -107,18 +109,21 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 - **painting** — Gallery; takeable, a real treasure (value 4, tvalue 6); `put painting in case` scores it
 - **ownersManual** ("manual") — Studio; takeable, readable (verbatim "Congratulations!..." source text)
 - **egg** — Up a Tree (in the nest); takeable, a real treasure (value 5, tvalue 5); `put egg in case` scores it. The source's fragility mechanic (breaks if opened/dropped carelessly, tied into the thief NPC) is not modeled — plain take/examine/put only
+- **leaves** — Grating Clearing; `move`/`take` reveals the grate underneath (canon's `burn`/`look under` triggers aren't modeled since this game has no `burn`/`look under` verb for anything yet, not just here)
+- **keys** ("key") — Maze-5, beside the skeleton; takeable, needed to `unlock` the grate from the Grating Room side
 
 ### 2.5 Verbs / commands
 - Movement: `north/south/east/west/up/down` (+ `n/s/e/w/u/d`), `in`/`enter`, `out`/`leave`; WASD + arrow keys
-- Objects: `open`, `close`, `take`/`get`, `drop`, `put <thing> in/on <container>` (trophy case only), `move`/`push`/`raise` (rug only), `examine`/`x`, `read`, `attack`/`kill`/`hit`/`fight` (the troll only)
+- Objects: `open`, `close`, `take`/`get`, `drop`, `put <thing> in/on <container>` (trophy case only), `move`/`push`/`raise` (rug and leaves only), `examine`/`x`, `read`, `attack`/`kill`/`hit`/`fight` (the troll only), `lock`/`unlock` (the grate only)
 - Meta: `look`, `inventory`/`i`/`inv`, `help`, `score`, `light lamp`/`turn on lamp`, `turn off lamp`/`extinguish lamp`/`douse lamp`
-- Click-to-interact on: mailbox, window, rug, trap door, lamp, sword, trophy case, troll (hover shows an `<Html>` label; click fires the same handler as the equivalent typed verb). Depositing into the case is typed-only (`put egg in case`) — no click affordance for a two-object verb yet, but taking a deposited treasure back out is a normal click like any other item
+- Click-to-interact on: mailbox, window, rug, trap door, lamp, sword, trophy case, troll, leaves, grate (both sides), skeleton key (hover shows an `<Html>` label; click fires the same handler as the equivalent typed verb). Depositing into the case and unlocking the grate are typed-only — no click affordance for two-object verbs yet, but taking a deposited treasure/the key back out is a normal click like any other item
 
 ### 2.6 Known simplifications (deliberate, not bugs)
 - No synonym support — each object has exactly one recognized name (e.g. "mailbox", not "box"); consistent throughout, not per-object
 - No "raise rug" hint text before it's moved (source has a specific tease line here; skipped for scope)
 - Dropping a lit lamp in a room does **not** leave that room lit (real Zork: a dropped lit light source keeps illuminating its room). Our `hasLampLit` is a single player-relative boolean, not per-room state
-- Room text omits exits to still-unbuilt rooms (the Maze, EW-Passage, the dam area, etc.) rather than promising passages that don't work yet
+- Room text omits exits to still-unbuilt rooms (EW-Passage, the Cyclops Room, the dam area, etc.) rather than promising passages that don't work yet
+- Leaves only reveal the grate via `move`/`take` (canon also allows `burn`/`look under`, but this game doesn't have those verbs for anything yet); `unlock`/`lock` ignore any noun/weapon phrase and just act on the grate, the only lockable thing in the game so far
 - Rope/knife/manual have no gameplay function yet beyond take/examine/read — no rope-climbing mechanic
 - Egg has no fragility/condition mechanic (breaks if handled carelessly in the source) — plain take/examine/put only
 - Combat odds are a simplified fixed-probability stand-in for the source's strength-table lookup (§1 decision 19); losing a fight bounces you to the Cellar instead of a real death (§1 decision 20); the troll's disarmed state isn't reflected in the room's static text, only in the combat log itself
@@ -140,7 +145,7 @@ room text or mechanics from memory.
 4. **The dam area** (reservoir, dam room/lobby/base) — reachable a different way (via the river/Dam Room, not yet connected to anything we've built), holds its own multi-step puzzle (wrench + bolt to drain the reservoir); bigger than the pure-geography passes so far, scope it separately
 5. ~~**Trophy case scoring**~~ — done. `score`/`moves` state added to `useGameState`; `put <treasure> in case` deposits (typed-only, no click affordance yet), taking it back out un-scores it, `score` verb prints the verbatim V-SCORE text/rank thresholds. Fetched `gverbs.zil`/`gmain.zil` (not previously cached) to find `SCORE-UPD`/`BASE-SCORE`/`SCORE-OBJ`, since they're generic-engine routines, not in `1actions.zil`/`1dungeon.zil`
 6. ~~**The Maze**~~ (Troll Room `west`) — done. All 15 numbered rooms, 4 dead ends, and the Grating Room, wired exactly per `MAZE-DIODES`/each `ROOM` definition. *Correction*: earlier notes here said this was reachable without combat via the grate - re-reading `GRATE-FUNCTION` showed that's backwards, the grate can only be unlocked from *inside* the maze (a skeleton key found at Maze-5), so it's an exit shortcut you earn, not an entrance. The Troll Room really was the only way in
-7. **Grate/leaf-clearing puzzle** (Grating Room `up`) — small, self-contained puzzle (find leaves, dig with a shovel to reveal the grate, find the skeleton key at Maze-5 to unlock `GRUNLOCK`); becomes a *second* way in/out once solved, not an entrance on its own
+7. ~~**Grate/leaf-clearing puzzle**~~ — done. `move`/`take leaves` at Grating Clearing reveals the grate; the skeleton key at Maze-5 unlocks it from the Grating Room side only (`unlock`/`lock` there, `open`/`close` from either side once unlocked) - a real second way in/out of the maze, verified live including the leaf-reveal-from-below case and both "wrong side" refusal messages
 8. ~~**Combat system**~~ — done. `attack`/`kill`/`hit`/`fight troll` (with or without the sword) in `useGameState`'s `attackTroll`; real `HERO-MELEE`/`TROLL-MELEE` flavor text (fetched from `gverbs.zil`/`1actions.zil`) over simplified fixed-odds resolution (§1 decisions 19-20). Winning sets `flags.trollDefeated`, removes the troll, and updates the room's blocked-exit messages; losing bounces the player to the Cellar rather than a real death, since there's no death/restart flow yet
 9. **Cyclops Room / Strange Passage / Treasure Room** (Maze-15 `east`) — needs a new "speak a word" verb mechanic (saying "ULYSSES"/"ODYSSEUS" scares the cyclops away and breaks a hole straight through to the Living Room - the game's most famous shortcut); Treasure Room is the thief's hideaway, better sequenced alongside the thief NPC
 
@@ -202,7 +207,10 @@ tables (`1actions.zil`), `GRATE-FUNCTION`/`GRATING-ROOM` (confirmed the
 grate is exit-only, not an entrance). Maze: `MAZE-1` through `MAZE-15`,
 `DEAD-END-1` through `DEAD-END-4`, `GRATING-ROOM`, `MAZE-DIODES`
 (`1dungeon.zil`/`1actions.zil`) — every exit in `rooms.js` traced back
-to one of these.
+to one of these. Grate puzzle: `LEAVES-APPEAR`/`LEAF-PILE`, `GRATE-FUNCTION`,
+`MAZE-11-FCN`, `CLEARING-FCN`, `OBJECT LEAVES`/`OBJECT KEYS`/`OBJECT GRATE`
+(`1dungeon.zil`/`1actions.zil`) — every message and state transition
+(`GRATE-REVEALED`/`GRUNLOCK`/open) traced back to these.
 
 ---
 

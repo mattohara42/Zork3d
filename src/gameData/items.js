@@ -107,4 +107,28 @@ export const INITIAL_ITEMS = {
     portable: true,
     location: 'studio',
   },
+
+  // Moving or taking it reveals the grate underneath (LEAVES-APPEAR in
+  // the source also fires on burn/look-under, which aren't verbs this
+  // game supports yet for anything, not just here).
+  leaves: {
+    id: 'leaves',
+    name: 'leaves',
+    description: 'A pile of leaves.',
+    floorText: 'On the ground is a pile of leaves.',
+    portable: true,
+    location: 'gratingClearing',
+  },
+
+  // No FDESC/LDESC on KEYS in the source - it just uses the engine's
+  // generic "there is an X here" fallback, which is what floorText is
+  // standing in for here.
+  keys: {
+    id: 'keys',
+    name: 'key',
+    description: 'A skeleton key.',
+    floorText: 'There is a skeleton key here.',
+    portable: true,
+    location: 'maze5',
+  },
 };

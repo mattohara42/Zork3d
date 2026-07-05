@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import Ground, { GROUND_Y } from '../primitives/Ground';
+import ObjectLabel from '../primitives/ObjectLabel';
 
 // "This is part of a maze of twisty little passages, all alike" is the
 // joke - every maze room uses this same component. A tiny per-room seed
@@ -18,7 +20,47 @@ function seededRocks(seed, count) {
   }));
 }
 
-export default function MazeRoom({ roomId }) {
+// Maze-5 only: the skeleton is flavor (NDESCBIT in the source - no
+// separate takeable item), but the skeleton key beside it is real and
+// takeable.
+function Skeleton({ items, onInteract }) {
+  const [hovered, setHovered] = useState(false);
+  const hasKeys = items.keys.location === 'maze5';
+
+  return (
+    <group position={[-1.5, GROUND_Y + 0.05, -3.5]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <boxGeometry args={[1.1, 0.35, 0.02]} />
+        <meshStandardMaterial color="#d8d0bc" />
+      </mesh>
+      {hasKeys && (
+        <mesh
+          position={[0.5, 0.03, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          onClick={(e) => {
+            e.stopPropagation();
+            onInteract('key', 'take');
+          }}
+          onPointerOver={(e) => {
+            e.stopPropagation();
+            setHovered(true);
+            document.body.style.cursor = 'pointer';
+          }}
+          onPointerOut={() => {
+            setHovered(false);
+            document.body.style.cursor = 'auto';
+          }}
+        >
+          <torusGeometry args={[0.12, 0.03, 6, 12]} />
+          <meshStandardMaterial color={hovered ? '#e8c66a' : '#b8952f'} />
+        </mesh>
+      )}
+      <ObjectLabel text="skeleton key" visible={hovered} position={[0.5, 0.3, 0]} />
+    </group>
+  );
+}
+
+export default function MazeRoom({ roomId, items, onInteract }) {
   const seed = roomId.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0) || 1;
   const rocks = seededRocks(seed, 4);
 
@@ -31,6 +73,7 @@ export default function MazeRoom({ roomId }) {
           <meshStandardMaterial color="#5c564c" />
         </mesh>
       ))}
+      {roomId === 'maze5' && <Skeleton items={items} onInteract={onInteract} />}
     </group>
   );
 }

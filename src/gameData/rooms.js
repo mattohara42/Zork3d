@@ -298,17 +298,33 @@ export const ROOMS = {
   },
 
   // Same displayed name as `clearing` below (both are literally "Clearing"
-  // in the source, distinguished only by description/exits) - the grate
-  // here is real in canon but hidden until a leaf-clearing puzzle we
-  // haven't built yet, so `down` stays a generic block for now rather than
-  // a fabricated permanent one.
+  // in the source, distinguished only by description/exits). The grate
+  // itself mirrors CLEARING-FCN's M-LOOK exactly: silent if never
+  // revealed, "securely fastened" once revealed but still locked/closed,
+  // "open...descending into darkness" once open. `down` only ever works
+  // once it's open - unlocking has to happen from the Grating Room side
+  // (Maze-5's skeleton key), matching canon's "can't reach the lock from
+  // here."
   gratingClearing: {
     id: 'gratingClearing',
     environment: 'surface',
     name: 'Clearing',
-    text: 'You are in a clearing, with a forest surrounding you on all sides. A path leads south.',
-    exits: { east: 'forest2', west: 'forest1', south: 'path', north: null, down: null },
+    text: (flags) =>
+      'You are in a clearing, with a forest surrounding you on all sides. A path leads south.' +
+      (flags.grateOpen
+        ? '\nThere is an open grating, descending into darkness.'
+        : flags.grateRevealed
+          ? '\nThere is a grating securely fastened into the ground.'
+          : ''),
+    exits: { east: 'forest2', west: 'forest1', south: 'path', north: null, down: 'gratingRoom' },
     blockedExits: { north: 'The forest becomes impenetrable to the north.' },
+    exitGuards: {
+      down: (flags) => {
+        if (!flags.grateRevealed) return "You can't go that way.";
+        if (!flags.grateOpen) return 'The grating is closed!';
+        return null;
+      },
+    },
   },
 
   clearing: {
@@ -564,22 +580,28 @@ export const ROOMS = {
     exits: { down: 'maze10', east: 'gratingRoom', north: 'maze13', west: 'maze12' },
   },
 
-  // The grate itself is real in canon but can only be unlocked from
-  // inside here (a skeleton key from Maze-5, not built yet - see the
-  // Grating Clearing note in the forest data), so `up` stays a generic
-  // "closed" block rather than a fabricated permanent one. SW (no
-  // cardinal alt) mapped to west.
+  // Mirrors MAZE-11-FCN's M-LOOK exactly across the three lock/open
+  // states. SW (no cardinal alt) mapped to west. `up` needs the grate
+  // both unlocked (skeleton key from Maze-5, unlock only works from this
+  // side) and open - see the `unlockGrate`/`openObject` handlers in
+  // useGameState.
   gratingRoom: {
     id: 'gratingRoom',
     environment: 'underground',
     name: 'Grating Room',
-    text:
+    text: (flags) =>
       'You are in a small room near the maze. There are twisty passages ' +
-      'in the immediate vicinity. Above you is a grating locked with a ' +
-      'skull-and-crossbones lock.',
+      'in the immediate vicinity. ' +
+      (flags.grateOpen
+        ? 'Above you is an open grating with sunlight pouring in.'
+        : flags.grateUnlocked
+          ? 'Above you is a grating.'
+          : 'Above you is a grating locked with a skull-and-crossbones lock.'),
     dark: true,
-    exits: { west: 'maze11', up: null },
-    blockedExits: { up: 'The grating is closed.' },
+    exits: { west: 'maze11', up: 'gratingClearing' },
+    exitGuards: {
+      up: (flags) => (flags.grateOpen ? null : 'The grating is closed.'),
+    },
   },
 
   // SW (no cardinal alt) mapped to west, pairing with Maze-11's own
