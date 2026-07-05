@@ -45,6 +45,51 @@ function TrophyCase() {
   );
 }
 
+// The case itself is a mostly-opaque box (only one thin side pane is
+// glass), so deposited treasures render just in front of it - like
+// items set out on a low shelf - rather than genuinely inside a
+// transparent case, the same simplification the lamp/sword already
+// make by sitting on top of it instead of behind real glass.
+function DepositedTreasure({ item, index, onInteract }) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <group position={[(index - 0.5) * 0.35, 0, 0]}>
+      <mesh
+        onClick={(e) => {
+          e.stopPropagation();
+          onInteract(item.id, 'take');
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHovered(true);
+          document.body.style.cursor = 'pointer';
+        }}
+        onPointerOut={() => {
+          setHovered(false);
+          document.body.style.cursor = 'auto';
+        }}
+      >
+        <boxGeometry args={[0.22, 0.22, 0.22]} />
+        <meshStandardMaterial color={hovered ? '#ffe08a' : '#d4af37'} />
+      </mesh>
+      <ObjectLabel text={item.name} visible={hovered} position={[0, 0.3, 0]} />
+    </group>
+  );
+}
+
+function DepositedTreasures({ items, onInteract }) {
+  const deposited = Object.values(items).filter((item) => item.location === 'trophyCase');
+
+  return (
+    <group position={[CASE_X, GROUND_Y + 0.8, CASE_Z + 0.65]}>
+      {deposited.map((item, i) => (
+        <DepositedTreasure key={item.id} item={item} index={i} onInteract={onInteract} />
+      ))}
+    </group>
+  );
+}
+
 function Rug({ moved, onInteract }) {
   const [hovered, setHovered] = useState(false);
   const x = moved ? RUG_MOVED_X : RUG_CENTER_X;
@@ -187,6 +232,7 @@ export default function LivingRoom({ flags, items, onInteract }) {
       </mesh>
 
       <TrophyCase />
+      <DepositedTreasures items={items} onInteract={onInteract} />
       {items.lamp.location === 'livingRoom' && <Lamp onInteract={onInteract} />}
       {items.sword.location === 'livingRoom' && <Sword onInteract={onInteract} />}
       <Rug moved={flags.rugMoved} onInteract={onInteract} />

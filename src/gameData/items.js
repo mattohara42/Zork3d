@@ -1,6 +1,8 @@
 // `location` is one of: a room id (dropped on the floor there), 'mailbox'
-// (sitting inside the mailbox, only reachable while it's open), or
-// 'inventory' (carried by the player).
+// (sitting inside the mailbox, only reachable while it's open),
+// 'trophyCase' (deposited, only reachable in the Living Room, scores its
+// tvalue - see useGameState's `score`), or 'inventory' (carried by the
+// player).
 //
 // `floorText`, if set, is auto-appended to a room's description whenever
 // the item's `location` equals that room's id - mirrors the ZIL engine's
@@ -8,6 +10,11 @@
 // up in the Living Room's text without LIVING-ROOM-FCN mentioning them
 // directly in the source: that's handled by a separate, generic part of
 // the original engine, not hand-coded per room).
+//
+// `value`/`tvalue` (treasures only) mirror the source's VALUE/TVALUE:
+// `value` is a one-time bonus paid out the first time the item is taken;
+// `tvalue` is added to the score for as long as it sits in the trophy
+// case (removed again if taken back out).
 export const INITIAL_ITEMS = {
   leaflet: {
     id: 'leaflet',
@@ -57,6 +64,9 @@ export const INITIAL_ITEMS = {
     location: 'attic',
   },
 
+  // value = one-time bonus for taking it (VALUE in source); tvalue =
+  // points while it sits in the trophy case (TVALUE) - recomputed live
+  // off whatever's actually deposited, not accumulated by hand.
   painting: {
     id: 'painting',
     name: 'painting',
@@ -64,6 +74,8 @@ export const INITIAL_ITEMS = {
     floorText:
       'Fortunately, there is still one chance for you to be a vandal, for on the far wall is a painting of unparalleled beauty.',
     portable: true,
+    value: 4,
+    tvalue: 6,
     location: 'gallery',
   },
 
@@ -71,7 +83,8 @@ export const INITIAL_ITEMS = {
   // opened/dropped carelessly (a whole fragility/condition mechanic tied
   // into the thief NPC who can open it safely later). Not modeled yet -
   // this is just a plain takeable treasure for now, same simplification
-  // already applied to the painting (no scoring/condition tracking).
+  // already applied to the painting (no condition tracking, scoring
+  // aside).
   egg: {
     id: 'egg',
     name: 'egg',
@@ -79,6 +92,8 @@ export const INITIAL_ITEMS = {
     floorText:
       "In the bird's nest is a large egg encrusted with precious jewels, apparently scavenged by a childless songbird. The egg is covered with fine gold inlay, and ornamented in lapis lazuli and mother-of-pearl. Unlike most eggs, this one is hinged and closed with a delicate looking clasp. The egg appears extremely fragile.",
     portable: true,
+    value: 5,
+    tvalue: 5,
     location: 'upATree',
   },
 

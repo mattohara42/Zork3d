@@ -26,6 +26,8 @@ Update this file when a decision or the room/item map changes meaningfully.
 | 14 | `src/components/rooms/*.jsx` (no "Scene" suffix) + `src/components/primitives/*.jsx` | Explicit restructure request; component function names match filenames |
 | 15 | `RoomRegistry` object map replaces `SceneManager`'s switch statement | Adding a room is one registry entry + one component file, not a switch case to remember in a second place |
 | 16 | `exitGuards` can return `{ flagUpdates }` on success, not just a block string | Needed for the Studio's up-chimney puzzle: climbing out isn't just allowed/denied, succeeding also resets `trapdoorBarred` so the Cellar route reopens — matches the ZIL `UP-CHIMNEY-FUNCTION`'s side effect, not just a pass/fail check |
+| 17 | Trophy case score is **recomputed from scratch** off current case contents, not incremented/decremented by hand | Mirrors `TROPHY-CASE-FCN`'s own `SETG SCORE <+ BASE-SCORE (OTVAL-FROB)>` — taking a deposited treasure back out just naturally drops its points next render, no separate "undo the deposit bonus" code path to keep in sync |
+| 18 | `moves` increments once per player action across three call sites (`moveRoom`, `interactWithObject`, `runCommand`'s verb switch), not per keystroke or render | `enter`/`leave` route through `moveRoom`, which already counts its own turn, so `runCommand` deliberately does *not* double-count those two - every other verb branch counts its own |
 
 **Standing engineering practice throughout:** every UI/behavior change in this
 project has been verified by actually running the app (`npm run dev` +
@@ -97,22 +99,25 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 - **sword** (elvish, antique) — Living Room; takeable; no combat use yet
 - **rope** — Attic; takeable, no use yet (canonically used to descend the Chasm/well elsewhere in the dungeon, not built yet)
 - **knife** — Attic; takeable, no combat use yet
-- **painting** — Gallery; takeable (a real treasure in the original, but no trophy-case scoring subsystem yet — see §3)
+- **painting** — Gallery; takeable, a real treasure (value 4, tvalue 6); `put painting in case` scores it
 - **ownersManual** ("manual") — Studio; takeable, readable (verbatim "Congratulations!..." source text)
-- **egg** — Up a Tree (in the nest); takeable, a real treasure in canon; the source's fragility mechanic (breaks if opened/dropped carelessly, tied into the thief NPC) is not modeled — plain take/examine only, same simplification already applied to the painting
+- **egg** — Up a Tree (in the nest); takeable, a real treasure (value 5, tvalue 5); `put egg in case` scores it. The source's fragility mechanic (breaks if opened/dropped carelessly, tied into the thief NPC) is not modeled — plain take/examine/put only
 
 ### 2.5 Verbs / commands
 - Movement: `north/south/east/west/up/down` (+ `n/s/e/w/u/d`), `in`/`enter`, `out`/`leave`; WASD + arrow keys
-- Objects: `open`, `close`, `take`/`get`, `drop`, `move`/`push`/`raise` (rug only), `examine`/`x`, `read`
-- Meta: `look`, `inventory`/`i`/`inv`, `help`, `light lamp`/`turn on lamp`, `turn off lamp`/`extinguish lamp`/`douse lamp`
-- Click-to-interact on: mailbox, window, rug, trap door, lamp, sword, trophy case (hover shows an `<Html>` label; click fires the same handler as the equivalent typed verb)
+- Objects: `open`, `close`, `take`/`get`, `drop`, `put <thing> in/on <container>` (trophy case only), `move`/`push`/`raise` (rug only), `examine`/`x`, `read`
+- Meta: `look`, `inventory`/`i`/`inv`, `help`, `score`, `light lamp`/`turn on lamp`, `turn off lamp`/`extinguish lamp`/`douse lamp`
+- Click-to-interact on: mailbox, window, rug, trap door, lamp, sword, trophy case (hover shows an `<Html>` label; click fires the same handler as the equivalent typed verb). Depositing into the case is typed-only (`put egg in case`) — no click affordance for a two-object verb yet, but taking a deposited treasure back out is a normal click like any other item
 
 ### 2.6 Known simplifications (deliberate, not bugs)
 - No synonym support — each object has exactly one recognized name (e.g. "mailbox", not "box"); consistent throughout, not per-object
 - No "raise rug" hint text before it's moved (source has a specific tease line here; skipped for scope)
 - Dropping a lit lamp in a room does **not** leave that room lit (real Zork: a dropped lit light source keeps illuminating its room). Our `hasLampLit` is a single player-relative boolean, not per-room state
-- Room text omits exits to still-unbuilt rooms (the Maze, Canyon View, Dam area, etc.) rather than promising passages that don't work yet
-- Painting/rope/knife/manual/egg have no gameplay function yet beyond take/examine/read — no trophy-case scoring, no rope-climbing mechanic, no combat, no egg fragility
+- Room text omits exits to still-unbuilt rooms (the Maze, the dam area, etc.) rather than promising passages that don't work yet
+- Rope/knife/manual have no gameplay function yet beyond take/examine/read — no rope-climbing mechanic, no combat
+- Egg has no fragility/condition mechanic (breaks if handled carelessly in the source) — plain take/examine/put only
+- `put` only understands the trophy case as a destination — there's no generic container system, since the case is the only real "put things in X" interaction in the game so far
+- `moves` counts one turn per action across nearly every verb, rather than exactly matching which specific verbs consume a turn in the original engine (`look`/`inventory`/`help`/`score` are free here, matching the original's own informational commands; finer-grained exceptions beyond that aren't modeled)
 
 ---
 
@@ -127,14 +132,14 @@ room text or mechanics from memory.
 2. ~~**Forest rooms** around the house~~ — done. `Forest1/2/3`, `Mountains`, `Path`, `UpATree`, `GratingClearing`, `Clearing`, wired to West/North/South/Behind House exactly on their canonical cardinal exits. The nest + jewel-encrusted egg (a real early treasure/puzzle) live in Up a Tree
 3. ~~**Canyon View / Cliff Middle / Canyon Bottom / End of Rainbow**~~ (Clearing `east`) — done. The rainbow crossing (Aragain Falls, On the Rainbow, the invisible pot-of-gold treasure) needs the sceptre puzzle first — not built, left as a visible-but-uncrossable flavor rainbow rather than a fake exit
 4. **The dam area** (reservoir, dam room/lobby/base) — reachable a different way (via the river/Dam Room, not yet connected to anything we've built), holds its own multi-step puzzle (wrench + bolt to drain the reservoir); bigger than the pure-geography passes so far, scope it separately
-5. **Trophy case scoring** — wire up `SETG SCORE` / treasure values now that the case exists as a fixture and there are real treasures (painting, egg) to deposit; needs a scoring concept in `useGameState` (`score`, `moves`) that doesn't exist yet. Worth doing before more treasures pile up with nowhere to "count"
+5. ~~**Trophy case scoring**~~ — done. `score`/`moves` state added to `useGameState`; `put <treasure> in case` deposits (typed-only, no click affordance yet), taking it back out un-scores it, `score` verb prints the verbatim V-SCORE text/rank thresholds. Fetched `gverbs.zil`/`gmain.zil` (not previously cached) to find `SCORE-UPD`/`BASE-SCORE`/`SCORE-OBJ`, since they're generic-engine routines, not in `1actions.zil`/`1dungeon.zil`
 6. **The Maze** (Troll Room `west`, once past the troll) — reachable without combat, so doesn't strictly need #7 first
 7. **Grate/leaf-clearing puzzle** (Grating Clearing `down`) — small, self-contained puzzle (find leaves, dig with a shovel to reveal the grate, then it's still locked from below until later); connects the forest to `MAZE-11`/the Maze from above once built
 
 ### Requires a new subsystem
 8. **Combat system** — needed to ever get past the Troll Room's east/west exits (`TROLL-FLAG`). This is the single biggest gate blocking further underground progress (`EW-PASSAGE`, most of the dungeon). Real scope: a strength/damage model, the sword's "glowing" danger-proximity hint, flee/fight verbs
 9. **NPCs beyond the troll** — thief (roams, steals/kills), cyclops (blocks a passage, solved by a spoken word not combat)
-10. **Score/turn counter + `score`/`diagnose` verbs**
+10. **`diagnose` verb** — death/health stats; blocked on a death mechanic existing at all (#13). `score`/`moves` themselves are done (see §3 near-term #5)
 11. **Save/restore** — no persistence at all currently; page refresh loses all state
 12. **Light source depletion** — the lamp is a battery lantern with finite life in the original; currently it never runs out
 13. **Death mechanic** — "likely to be eaten by a grue" is flavor text only right now; there's no actual grue encounter or death/restart flow when lingering in the dark. Explicitly considered and declined once already: an instant Game Over the moment you *enter* any dark room without the lamp lit. Rejected because (a) the original never kills you on the first dark step — it warns, and only risks a probabilistic grue death if you keep acting while still in the dark, and (b) there's no Game Over screen/restart flow to land on yet. Build the real staged version here, not a shortcut bolted onto room transitions
@@ -157,16 +162,19 @@ Infocom team via the Jason Scott / historicalsource GitHub org). This is
 the authoritative reference for this project, not fan transcripts or
 walkthroughs.
 
-Two files cover essentially everything needed so far:
-- `1dungeon.zil` — room (`<ROOM ...>`) and object (`<OBJECT ...>`) definitions: exits, `DESC`/`LDESC`/`FDESC`, flags (`ONBIT` = naturally lit, `INVISIBLE`, `TAKEBIT`, etc.)
-- `1actions.zil` — behavior routines (`<ROUTINE ...>`): verb handling, exact message text, one-shot effects like the trap door slam
+Four files cover essentially everything needed so far:
+- `1dungeon.zil` — room (`<ROOM ...>`) and object (`<OBJECT ...>`) definitions: exits, `DESC`/`LDESC`/`FDESC`, flags (`ONBIT` = naturally lit, `INVISIBLE`, `TAKEBIT`, etc.), `VALUE`/`TVALUE` on treasures
+- `1actions.zil` — Zork I-specific behavior routines (`<ROUTINE ...>`): verb handling, exact message text, one-shot effects like the trap door slam, room-specific `ACTION` functions (e.g. `TROPHY-CASE-FCN`)
+- `gverbs.zil` / `gmain.zil` — the **generic** engine shared across the whole Zork trilogy, not Zork I-specific: this is where scoring (`SCORE-UPD`, `BASE-SCORE`, `SCORE-OBJ`), `V-SCORE`'s exact text/rank thresholds, and other cross-game verbs actually live. `1actions.zil` calls into these but doesn't define them - look here first for anything that feels like it should be "obviously somewhere" but isn't in the two Zork I files
 
 Fetch directly rather than trusting recall:
 ```
 curl -sSL https://raw.githubusercontent.com/historicalsource/zork1/master/1dungeon.zil
 curl -sSL https://raw.githubusercontent.com/historicalsource/zork1/master/1actions.zil
+curl -sSL https://raw.githubusercontent.com/historicalsource/zork1/master/gverbs.zil
+curl -sSL https://raw.githubusercontent.com/historicalsource/zork1/master/gmain.zil
 ```
-(Both were cached in this session's scratchpad, not in the repo — re-fetch
+(All were cached in this session's scratchpad, not in the repo — re-fetch
 in future sessions rather than assuming they're available locally.)
 
 Related repos also seen during research, not currently needed:

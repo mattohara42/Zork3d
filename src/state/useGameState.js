@@ -18,8 +18,9 @@ const LAMP_OFF_COMMANDS = ['turn off lamp', 'extinguish lamp', 'douse lamp'];
 
 const HELP_TEXT =
   'Commands: north/south/east/west/up/down/in/out (or n/s/e/w/u/d), look, ' +
-  'examine <thing>, open/close <thing>, take/drop <thing>, read <thing>, ' +
-  'move <thing>, inventory, light lamp / turn off lamp.';
+  'examine <thing>, open/close <thing>, take/drop <thing>, put <thing> in ' +
+  'case, read <thing>, move <thing>, inventory, score, light lamp / turn ' +
+  'off lamp.';
 
 function resolveRoomText(room, flags, items, currentRoom) {
   const base = typeof room.text === 'function' ? room.text(flags) : room.text;
@@ -49,6 +50,16 @@ export function useGameState() {
   });
   const [items, setItems] = useState(INITIAL_ITEMS);
   const [terminalLogs, setTerminalLogs] = useState([]);
+  // baseScore accumulates one-time "first take" bonuses (a treasure's
+  // VALUE, awarded once via takeItem then never again - mirrors ZIL's
+  // SCORE-OBJ zeroing the property after scoring it). The trophy case's
+  // contribution (TVALUE) isn't accumulated the same way - it's
+  // recomputed fresh from whatever's actually in the case right now, so
+  // taking a deposited treasure back out correctly removes its points
+  // (mirrors TROPHY-CASE-FCN's own SETG SCORE <+ BASE-SCORE (OTVAL-FROB)>
+  // rather than incrementing/decrementing by hand).
+  const [baseScore, setBaseScore] = useState(0);
+  const [moves, setMoves] = useState(0);
 
   const room = ROOMS[currentRoom];
   // isDark: a dark room with no light source - pitch black, can't see.
@@ -59,9 +70,18 @@ export function useGameState() {
   const isUnderground = !!room.dark && hasLampLit;
   const roomText = resolveRoomText(room, flags, items, currentRoom);
 
+  const score = useMemo(() => {
+    const caseValue = Object.values(items)
+      .filter((item) => item.location === 'trophyCase')
+      .reduce((sum, item) => sum + (item.tvalue || 0), 0);
+    return baseScore + caseValue;
+  }, [baseScore, items]);
+
   const log = useCallback((message) => {
     setTerminalLogs((prev) => [...prev, message]);
   }, []);
+
+  const incrementMoves = useCallback(() => setMoves((m) => m + 1), []);
 
   const isItemReachable = useCallback(
     (item) => {
@@ -69,6 +89,9 @@ export function useGameState() {
       if (item.location === currentRoom) return true;
       if (item.location === 'mailbox') {
         return currentRoom === 'westOfHouse' && flags.mailboxOpen;
+      }
+      if (item.location === 'trophyCase') {
+        return currentRoom === 'livingRoom';
       }
       return false;
     },
@@ -89,6 +112,7 @@ export function useGameState() {
 
   const moveRoom = useCallback(
     (direction) => {
+      incrementMoves();
       const targetId = room.exits[direction];
       if (!targetId) {
         const blockedMessage = room.blockedExits && room.blockedExits[direction];
@@ -132,7 +156,7 @@ export function useGameState() {
         log('It is pitch black. You are likely to be eaten by a grue.');
       }
     },
-    [room, flags, inventory, hasLampLit, log]
+    [room, flags, inventory, hasLampLit, log, incrementMoves]
   );
 
   const openObject = useCallback(
@@ -266,9 +290,20 @@ export function useGameState() {
         log("You can't take that.");
         return;
       }
+      // A treasure's one-time "first take" bonus (mirrors SCORE-OBJ
+      // zeroing VALUE after it's scored once - valueScored is our
+      // equivalent of that zeroing, so picking it up again later, e.g.
+      // after dropping it, doesn't pay out twice).
+      if (item.value && !item.valueScored) {
+        setBaseScore((s) => s + item.value);
+      }
       setItems((prev) => ({
         ...prev,
-        [item.id]: { ...prev[item.id], location: 'inventory' },
+        [item.id]: {
+          ...prev[item.id],
+          location: 'inventory',
+          valueScored: prev[item.id].valueScored || !!item.value,
+        },
       }));
       setInventory((prev) => [...prev, item.id]);
       log('Taken.');
@@ -297,6 +332,36 @@ export function useGameState() {
       log('Dropped.');
     },
     [findItemByName, currentRoom, hasLampLit, log]
+  );
+
+  /**
+   * "put <item> in <container>" - the trophy case is the only real
+   * container a player deposits things into, so that's all this
+   * supports for now rather than a generic container system.
+   */
+  const putItem = useCallback(
+    (noun, containerNoun) => {
+      const item = findItemByName(noun);
+      if (!item || item.location !== 'inventory') {
+        log("You don't have that.");
+        return;
+      }
+      if (containerNoun !== 'case' && containerNoun !== 'trophy case') {
+        log("You can't put that there.");
+        return;
+      }
+      if (currentRoom !== 'livingRoom') {
+        log("You don't see that here.");
+        return;
+      }
+      setItems((prev) => ({
+        ...prev,
+        [item.id]: { ...prev[item.id], location: 'trophyCase' },
+      }));
+      setInventory((prev) => prev.filter((id) => id !== item.id));
+      log('Done.');
+    },
+    [findItemByName, currentRoom, log]
   );
 
   /** "move"/"push" the rug, revealing the trap door underneath - one-shot. */
@@ -363,9 +428,14 @@ export function useGameState() {
       if (noun === 'trophy case' || noun === 'case') {
         if (currentRoom !== 'livingRoom') {
           log("You don't see that here.");
-        } else {
-          log("There's nothing special about the trophy case.");
+          return;
         }
+        const deposited = Object.values(items).filter((i) => i.location === 'trophyCase');
+        log(
+          deposited.length === 0
+            ? 'The trophy case is empty.'
+            : `The trophy case contains: ${deposited.map((i) => i.name).join(', ')}.`
+        );
         return;
       }
       if (noun === 'trap door' || noun === 'trapdoor') {
@@ -395,7 +465,7 @@ export function useGameState() {
       }
       log("You don't see that here.");
     },
-    [currentRoom, flags.windowOpen, flags.rugMoved, flags.trapdoorOpen, describeMailbox, findItemByName, isItemReachable, log]
+    [currentRoom, flags.windowOpen, flags.rugMoved, flags.trapdoorOpen, describeMailbox, findItemByName, isItemReachable, items, log]
   );
 
   const readItem = useCallback(
@@ -423,6 +493,24 @@ export function useGameState() {
     log(roomText);
   }, [roomText, log]);
 
+  /** Verbatim V-SCORE text/thresholds - 350 is the real Zork I max. */
+  const showScore = useCallback(() => {
+    let rank;
+    if (score === 350) rank = 'Master Adventurer';
+    else if (score > 330) rank = 'Wizard';
+    else if (score > 300) rank = 'Master';
+    else if (score > 200) rank = 'Adventurer';
+    else if (score > 100) rank = 'Junior Adventurer';
+    else if (score > 50) rank = 'Novice Adventurer';
+    else if (score > 25) rank = 'Amateur Adventurer';
+    else rank = 'Beginner';
+
+    log(
+      `Your score is ${score} (total of 350 points), in ${moves} move${moves === 1 ? '' : 's'}.\n` +
+        `This gives you the rank of ${rank}.`
+    );
+  }, [score, moves, log]);
+
   const setLampLit = useCallback(
     (lit) => {
       // Deliberately stricter than "reachable" (room-or-inventory): our
@@ -444,6 +532,7 @@ export function useGameState() {
   /** Generic dispatcher matching the requested hook shape. */
   const interactWithObject = useCallback(
     (objectName, action) => {
+      incrementMoves();
       switch (action) {
         case 'open': openObject(objectName); break;
         case 'close': closeObject(objectName); break;
@@ -455,7 +544,7 @@ export function useGameState() {
         default: log('Nothing happens.');
       }
     },
-    [openObject, closeObject, takeItem, dropItem, moveObject, examineObject, readItem, log]
+    [openObject, closeObject, takeItem, dropItem, moveObject, examineObject, readItem, log, incrementMoves]
   );
 
   /** Parses a free-text command line, same verb set as the vanilla engine. */
@@ -480,11 +569,17 @@ export function useGameState() {
         log(HELP_TEXT);
         return;
       }
+      if (cmd === 'score') {
+        showScore();
+        return;
+      }
       if (LAMP_ON_COMMANDS.includes(cmd)) {
+        incrementMoves();
         setLampLit(true);
         return;
       }
       if (LAMP_OFF_COMMANDS.includes(cmd)) {
+        incrementMoves();
         setLampLit(false);
         return;
       }
@@ -494,25 +589,54 @@ export function useGameState() {
       const skipAt = verb === 'look' && words[1] === 'at' ? 2 : 1;
       const noun = words.slice(skipAt).join(' ').replace(/^the\s+/, '').trim();
 
+      // 'enter'/'leave' go through moveRoom, which already counts its own
+      // turn - every other branch here counts one of its own so the two
+      // paths don't double up on a single command.
       switch (verb) {
         case 'enter': moveRoom('in'); break;
         case 'leave': moveRoom('out'); break;
-        case 'open': openObject(noun); break;
-        case 'close': closeObject(noun); break;
+        case 'open': incrementMoves(); openObject(noun); break;
+        case 'close': incrementMoves(); closeObject(noun); break;
         case 'take':
-        case 'get': takeItem(noun); break;
-        case 'drop': dropItem(noun); break;
+        case 'get': incrementMoves(); takeItem(noun); break;
+        case 'drop': incrementMoves(); dropItem(noun); break;
+        case 'put': {
+          incrementMoves();
+          const match = noun.match(/^(.*?)\s+(?:in|on)\s+(.*)$/);
+          if (!match) {
+            log('Put it where?');
+            break;
+          }
+          putItem(match[1].trim(), match[2].trim().replace(/^the\s+/, ''));
+          break;
+        }
         case 'move':
         case 'push':
-        case 'raise': moveObject(noun); break;
+        case 'raise': incrementMoves(); moveObject(noun); break;
         case 'examine':
         case 'x':
-        case 'look': examineObject(noun); break;
-        case 'read': readItem(noun); break;
+        case 'look': incrementMoves(); examineObject(noun); break;
+        case 'read': incrementMoves(); readItem(noun); break;
         default: log("I don't understand that command.");
       }
     },
-    [moveRoom, lookAround, showInventory, setLampLit, log, openObject, closeObject, takeItem, dropItem, moveObject, examineObject, readItem]
+    [
+      moveRoom,
+      lookAround,
+      showInventory,
+      showScore,
+      setLampLit,
+      log,
+      openObject,
+      closeObject,
+      takeItem,
+      dropItem,
+      putItem,
+      moveObject,
+      examineObject,
+      readItem,
+      incrementMoves,
+    ]
   );
 
   const exits = useMemo(() => room.exits, [room]);
@@ -528,6 +652,8 @@ export function useGameState() {
     items,
     flags,
     hasLampLit,
+    score,
+    moves,
     terminalLogs,
     moveRoom,
     interactWithObject,
