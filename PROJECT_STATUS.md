@@ -62,7 +62,7 @@ src/
 legacy-vanilla/index.html — superseded single-file prototype, kept for reference only
 ```
 
-### 2.3 Rooms implemented (20)
+### 2.3 Rooms implemented (24)
 
 | Room | Exits | Notable mechanics |
 |---|---|---|
@@ -85,7 +85,11 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 | Forest Path | up→Up a Tree, N→Grating Clearing, E→Forest 2, S→North of House, W→Forest 1 | The climbable tree lives here |
 | Up a Tree | down→Path, up(blocked: can't climb higher) | No `Ground` — a branch platform stands in for the floor plane, surrounded by leaf-cluster meshes instead of grass/sky; bird's nest + egg (takeable) |
 | Clearing (grating) | E→Forest 2, W→Forest 1, S→Path, N(blocked), down(blocked — grate not revealed) | Grate/leaf-clearing puzzle not built yet; `down` is a real canon exit gated behind a puzzle we haven't implemented, not a fabricated permanent block |
-| Clearing (plain) | N→Forest 2, S→Forest 3, W→Behind House, E(blocked — Canyon View not built) | Same displayed name ("Clearing") as the grating one, matching canon — two distinct rooms, same DESC, different LDESC/exits |
+| Clearing (plain) | N→Forest 2, S→Forest 3, W→Behind House, E→Canyon View | Same displayed name ("Clearing") as the grating one, matching canon — two distinct rooms, same DESC, different LDESC/exits |
+| Canyon View | N→Clearing, E/down→Cliff Middle, W→Forest 3 (one-way), S(blocked: storm) | Canon's NW-to-Clearing is diagonal-only with no cardinal alternative, mapped to N since W is taken by Forest 3; Forest 3 has no exit back here, matching canon's own asymmetry |
+| Rocky Ledge | up→Canyon View, down→Canyon Bottom | Midpoint of the climbable cliff |
+| Canyon Bottom | up→Rocky Ledge, N→End of Rainbow | River runoff strip across the floor |
+| End of Rainbow | S→Canyon Bottom | Canon's only exit is SW with no cardinal alt — mapped to S to avoid a dead end, since the other three exits (up/ne/east to the rainbow) all require a sceptre/rainbow puzzle not built yet; a rainbow arc renders east as pure flavor, not yet crossable. The invisible pot-of-gold treasure (only appears once the rainbow is solid) is deliberately not added as an item yet |
 
 ### 2.4 Items implemented (8)
 - **leaflet** — starts in mailbox; readable ("WELCOME TO ZORK!..." — verbatim source text)
@@ -121,24 +125,26 @@ room text or mechanics from memory.
 ### Near-term (extends the existing map/mechanics with no new subsystems)
 1. ~~**Attic** (Kitchen `up`) and **Studio**~~ — done. Turned out Kitchen's `down` (chimney) is a permanent dead end in canon, so Studio's only real entrance is Kitchen→...→Living Room→Cellar→East of Chasm→Gallery→Studio; built all four rooms on that path for real reachability (user-confirmed scope)
 2. ~~**Forest rooms** around the house~~ — done. `Forest1/2/3`, `Mountains`, `Path`, `UpATree`, `GratingClearing`, `Clearing`, wired to West/North/South/Behind House exactly on their canonical cardinal exits. The nest + jewel-encrusted egg (a real early treasure/puzzle) live in Up a Tree
-3. **Canyon View / Canyon Bottom / Aragain Falls / the dam area** (Clearing `east`) — the other branch off the forest, self-contained, unlocks the reservoir/dam puzzle chain and more treasures. Good next candidate: same shape as the forest work just done (pure geography + a couple items), no new subsystem
-4. **Trophy case scoring** — wire up `SETG SCORE` / treasure values now that the case exists as a fixture and there are real treasures (painting, egg) to deposit; needs a scoring concept in `useGameState` (`score`, `moves`) that doesn't exist yet. Worth doing before more treasures pile up with nowhere to "count"
-5. **The Maze** (Troll Room `west`, once past the troll) — reachable without combat, so doesn't strictly need #6 first
-6. **Grate/leaf-clearing puzzle** (Grating Clearing `down`) — small, self-contained puzzle (find leaves, dig with a shovel to reveal the grate, then it's still locked from below until later); connects the forest to `MAZE-11`/the Maze from above once built
+3. ~~**Canyon View / Cliff Middle / Canyon Bottom / End of Rainbow**~~ (Clearing `east`) — done. The rainbow crossing (Aragain Falls, On the Rainbow, the invisible pot-of-gold treasure) needs the sceptre puzzle first — not built, left as a visible-but-uncrossable flavor rainbow rather than a fake exit
+4. **The dam area** (reservoir, dam room/lobby/base) — reachable a different way (via the river/Dam Room, not yet connected to anything we've built), holds its own multi-step puzzle (wrench + bolt to drain the reservoir); bigger than the pure-geography passes so far, scope it separately
+5. **Trophy case scoring** — wire up `SETG SCORE` / treasure values now that the case exists as a fixture and there are real treasures (painting, egg) to deposit; needs a scoring concept in `useGameState` (`score`, `moves`) that doesn't exist yet. Worth doing before more treasures pile up with nowhere to "count"
+6. **The Maze** (Troll Room `west`, once past the troll) — reachable without combat, so doesn't strictly need #7 first
+7. **Grate/leaf-clearing puzzle** (Grating Clearing `down`) — small, self-contained puzzle (find leaves, dig with a shovel to reveal the grate, then it's still locked from below until later); connects the forest to `MAZE-11`/the Maze from above once built
 
 ### Requires a new subsystem
-7. **Combat system** — needed to ever get past the Troll Room's east/west exits (`TROLL-FLAG`). This is the single biggest gate blocking further underground progress (`EW-PASSAGE`, most of the dungeon). Real scope: a strength/damage model, the sword's "glowing" danger-proximity hint, flee/fight verbs
-8. **NPCs beyond the troll** — thief (roams, steals/kills), cyclops (blocks a passage, solved by a spoken word not combat)
-9. **Score/turn counter + `score`/`diagnose` verbs**
-10. **Save/restore** — no persistence at all currently; page refresh loses all state
-11. **Light source depletion** — the lamp is a battery lantern with finite life in the original; currently it never runs out
-12. **Death mechanic** — "likely to be eaten by a grue" is flavor text only right now; there's no actual grue encounter or death/restart flow when lingering in the dark. Explicitly considered and declined once already: an instant Game Over the moment you *enter* any dark room without the lamp lit. Rejected because (a) the original never kills you on the first dark step — it warns, and only risks a probabilistic grue death if you keep acting while still in the dark, and (b) there's no Game Over screen/restart flow to land on yet. Build the real staged version here, not a shortcut bolted onto room transitions
-13. **Egg fragility** — breaks if opened/dropped carelessly in the source (`EGG-OBJECT`, `BAD-EGG`), tied into the thief NPC being the only safe way to open it. Needs a simple "damaged" condition flag on the item plus thief NPC support (#8) to be worth building
+8. **Combat system** — needed to ever get past the Troll Room's east/west exits (`TROLL-FLAG`). This is the single biggest gate blocking further underground progress (`EW-PASSAGE`, most of the dungeon). Real scope: a strength/damage model, the sword's "glowing" danger-proximity hint, flee/fight verbs
+9. **NPCs beyond the troll** — thief (roams, steals/kills), cyclops (blocks a passage, solved by a spoken word not combat)
+10. **Score/turn counter + `score`/`diagnose` verbs**
+11. **Save/restore** — no persistence at all currently; page refresh loses all state
+12. **Light source depletion** — the lamp is a battery lantern with finite life in the original; currently it never runs out
+13. **Death mechanic** — "likely to be eaten by a grue" is flavor text only right now; there's no actual grue encounter or death/restart flow when lingering in the dark. Explicitly considered and declined once already: an instant Game Over the moment you *enter* any dark room without the lamp lit. Rejected because (a) the original never kills you on the first dark step — it warns, and only risks a probabilistic grue death if you keep acting while still in the dark, and (b) there's no Game Over screen/restart flow to land on yet. Build the real staged version here, not a shortcut bolted onto room transitions
+14. **Rainbow/sceptre puzzle** — the sceptre (from the Egyptian Room, deep in the dungeon) waved on the rainbow makes it solid, opening On the Rainbow, Aragain Falls, and the pot-of-gold treasure. Blocked on reaching the sceptre's location first, so naturally sequenced after more of the underground is built
+15. **Egg fragility** — breaks if opened/dropped carelessly in the source (`EGG-OBJECT`, `BAD-EGG`), tied into the thief NPC being the only safe way to open it. Needs a simple "damaged" condition flag on the item plus thief NPC support (#9) to be worth building
 
 ### Housekeeping / non-gameplay
-11. No automated test suite — all verification so far has been manual (Playwright driven live-browser checks per change, not committed as regression tests)
-12. Bundle size warning on build (`>500kB` single chunk) — candidate for route-level or R3F-scene code-splitting if it matters for load time
-13. `legacy-vanilla/` is inert reference-only; consider deleting once nobody needs to diff against it
+16. No automated test suite — all verification so far has been manual (Playwright driven live-browser checks per change, not committed as regression tests)
+17. Bundle size warning on build (`>500kB` single chunk) — candidate for route-level or R3F-scene code-splitting if it matters for load time
+18. `legacy-vanilla/` is inert reference-only; consider deleting once nobody needs to diff against it
 
 ---
 
@@ -172,7 +178,8 @@ Related repos also seen during research, not currently needed:
 North of House, South of House, Behind House (+ kitchen window), Kitchen,
 Living Room (+ rug, trap door, trophy case), Cellar, Troll Room (+ troll),
 Attic, East of Chasm, Gallery, Studio, Forest 1/2/3, Mountains, Forest
-Path, Up a Tree (+ nest), Grating Clearing, Clearing, mailbox + leaflet,
+Path, Up a Tree (+ nest), Grating Clearing, Clearing, Canyon View, Rocky
+Ledge (Cliff Middle), Canyon Bottom, End of Rainbow, mailbox + leaflet,
 lamp, sword, rope, knife, painting, owner's manual, egg.
 
 ---

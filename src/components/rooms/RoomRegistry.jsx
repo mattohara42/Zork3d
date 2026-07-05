@@ -18,6 +18,10 @@ import Path from './Path';
 import UpATree from './UpATree';
 import GratingClearing from './GratingClearing';
 import Clearing from './Clearing';
+import CanyonView from './CanyonView';
+import CliffMiddle from './CliffMiddle';
+import CanyonBottom from './CanyonBottom';
+import EndOfRainbow from './EndOfRainbow';
 
 export const RoomRegistry = {
   westOfHouse: (props) => <WestOfHouse {...props} />,
@@ -40,4 +44,8 @@ export const RoomRegistry = {
   upATree: (props) => <UpATree {...props} />,
   gratingClearing: (props) => <GratingClearing {...props} />,
   clearing: (props) => <Clearing {...props} />,
+  canyonView: (props) => <CanyonView {...props} />,
+  cliffMiddle: (props) => <CliffMiddle {...props} />,
+  canyonBottom: (props) => <CanyonBottom {...props} />,
+  endOfRainbow: (props) => <EndOfRainbow {...props} />,
 };

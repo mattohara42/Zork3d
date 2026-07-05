@@ -304,6 +304,69 @@ export const ROOMS = {
     environment: 'surface',
     name: 'Clearing',
     text: 'You are in a small clearing in a well marked forest path that extends to the east and west.',
-    exits: { east: null, north: 'forest2', south: 'forest3', west: 'behindHouse', up: null },
+    exits: { east: 'canyonView', north: 'forest2', south: 'forest3', west: 'behindHouse', up: null },
+  },
+
+  canyonView: {
+    id: 'canyonView',
+    environment: 'surface',
+    name: 'Canyon View',
+    text:
+      'You are at the top of the Great Canyon on its west wall. From here ' +
+      'there is a marvelous view of the canyon and parts of the Frigid River ' +
+      'upstream. Across the canyon, the walls of the White Cliffs join the ' +
+      'mighty ramparts of the Flathead Mountains to the east. Following the ' +
+      'Canyon upstream to the north, Aragain Falls may be seen, complete with ' +
+      'rainbow. The mighty Frigid River flows out from a great dark cavern. ' +
+      'To the west and south can be seen an immense forest, stretching for ' +
+      'miles around. A path leads northwest. It is possible to climb down ' +
+      'into the canyon from here.',
+    // Canon's own NW-to-Clearing exit is diagonal-only with no cardinal
+    // alternative offered (unlike the house ring's redundant NE/SE, which
+    // we just drop in favor of the cardinal already given) - mapped to
+    // north since west is already Forest 3, to avoid a real dead end.
+    exits: { north: 'clearing', east: 'cliffMiddle', down: 'cliffMiddle', west: 'forest3', south: null },
+    blockedExits: { south: 'Storm-tossed trees block your way.' },
+  },
+
+  cliffMiddle: {
+    id: 'cliffMiddle',
+    environment: 'surface',
+    name: 'Rocky Ledge',
+    text:
+      'You are on a ledge about halfway up the wall of the river canyon. ' +
+      'You can see from here that the main flow from Aragain Falls twists ' +
+      'along a passage which it is impossible for you to enter. Below you ' +
+      'is the canyon bottom. Above you is more cliff, which appears climbable.',
+    exits: { up: 'canyonView', down: 'canyonBottom' },
+  },
+
+  canyonBottom: {
+    id: 'canyonBottom',
+    environment: 'surface',
+    name: 'Canyon Bottom',
+    text:
+      'You are beneath the walls of the river canyon which may be climbable ' +
+      'here. The lesser part of the runoff of Aragain Falls flows by below. ' +
+      'To the north is a narrow path.',
+    exits: { up: 'cliffMiddle', north: 'endOfRainbow' },
+  },
+
+  // Canon's only way back from here is SW (no cardinal alternative), and
+  // the other three exits all require RAINBOW-FLAG (a sceptre/rainbow
+  // puzzle not built yet) - without a cardinal remap this would be a
+  // genuine dead end, so SW maps to south rather than being silently
+  // dropped like the house ring's redundant diagonals are.
+  endOfRainbow: {
+    id: 'endOfRainbow',
+    environment: 'surface',
+    name: 'End of Rainbow',
+    text:
+      'You are on a small, rocky beach on the continuation of the Frigid ' +
+      'River past the Falls. The beach is narrow due to the presence of the ' +
+      'White Cliffs. The river canyon opens here and sunlight shines in from ' +
+      'above. A rainbow crosses over the falls to the east and a narrow path ' +
+      'continues to the southwest.',
+    exits: { south: 'canyonBottom' },
   },
 };
