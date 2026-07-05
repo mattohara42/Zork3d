@@ -167,19 +167,12 @@ export const ROOMS = {
         ? ''
         : '\nA nasty-looking troll, brandishing a bloody axe, blocks all passages out of the room.'),
     dark: true,
-    // East (EW-Passage) and west (the Maze) both really do open once the
-    // troll is dealt with in canon. West has a real destination now that
-    // the Maze exists, gated the same way the Cellar's `up`/Living
-    // Room's `down` already are; east stays unbuilt since EW-Passage and
-    // the rest of that side of the dungeon are a much larger separate pass.
-    exits: { south: 'cellar', east: null, west: 'maze1' },
-    blockedExits: {
-      east: (flags) =>
-        flags.trollDefeated
-          ? "The passage beyond hasn't been explored yet."
-          : 'The troll fends you off with a menacing gesture.',
-    },
+    // East (EW-Passage) and west (the Maze) both really open once the
+    // troll is dealt with in canon, gated the same way the Cellar's
+    // `up`/Living Room's `down` already are.
+    exits: { south: 'cellar', east: 'ewPassage', west: 'maze1' },
     exitGuards: {
+      east: (flags) => (flags.trollDefeated ? null : 'The troll fends you off with a menacing gesture.'),
       west: (flags) => (flags.trollDefeated ? null : 'The troll fends you off with a menacing gesture.'),
     },
   },
@@ -718,5 +711,159 @@ export const ROOMS = {
     exits: { down: 'cyclopsRoom' },
     onEnter: (flags) =>
       flags.treasureRoomVisited ? null : { flagUpdates: { treasureRoomVisited: true }, scoreBonus: 25 },
+  },
+
+  // The central hub connecting the Troll Room to the rest of the
+  // dungeon. Round Room's own `south`/`SE` (Narrow Passage, Engravings
+  // Cave) and Deep Canyon's `NW` (Reservoir South) are real in canon but
+  // lead into the Temple/Egyptian Room network and the reservoir/boat
+  // area respectively - both much larger separate passes, so those
+  // exits are omitted here rather than promising passages that don't
+  // work yet, same convention as everywhere else in this file.
+  ewPassage: {
+    id: 'ewPassage',
+    environment: 'underground',
+    name: 'East-West Passage',
+    text: 'This is a narrow east-west passageway. There is a narrow stairway leading down at the north end of the room.',
+    dark: true,
+    exits: { east: 'roundRoom', west: 'trollRoom', down: 'chasmRoom', north: 'chasmRoom' },
+    onEnter: (flags) => (flags.ewPassageVisited ? null : { flagUpdates: { ewPassageVisited: true }, scoreBonus: 5 }),
+  },
+
+  roundRoom: {
+    id: 'roundRoom',
+    environment: 'underground',
+    name: 'Round Room',
+    text: 'This is a circular stone room with passages in all directions. Several of them have unfortunately been blocked by cave-ins.',
+    dark: true,
+    exits: { east: 'loudRoom', west: 'ewPassage', north: 'nsPassage', south: null },
+  },
+
+  // NE (no cardinal alt) mapped to east.
+  nsPassage: {
+    id: 'nsPassage',
+    environment: 'underground',
+    name: 'North-South Passage',
+    text: 'This is a high north-south passage, which forks to the northeast.',
+    dark: true,
+    exits: { north: 'chasmRoom', east: 'deepCanyon', south: 'roundRoom' },
+  },
+
+  // SW (redundant with the cardinal UP, both reach East-West Passage) is
+  // dropped, matching the house ring's own redundant-diagonal handling.
+  chasmRoom: {
+    id: 'chasmRoom',
+    environment: 'underground',
+    name: 'Chasm',
+    text: 'A chasm runs southwest to northeast and the path follows it. You are on the south side of the chasm, where a crack opens into a passage.',
+    dark: true,
+    exits: { up: 'ewPassage', south: 'nsPassage', down: null },
+    blockedExits: { down: 'Are you out of your mind?' },
+  },
+
+  // Simplified: always loud. Canon's exact state depends on GATES-OPEN
+  // *and* a LOW-TIDE reservoir-draining timer we don't model (see the
+  // Dam Room note below) - the real payoff there is the ECHO/platinum-
+  // bar puzzle, deferred rather than half-built.
+  loudRoom: {
+    id: 'loudRoom',
+    environment: 'underground',
+    name: 'Loud Room',
+    text:
+      'This is a large room with a ceiling which cannot be detected from ' +
+      'the ground. There is a narrow passage from east to west and a ' +
+      'stone stairway leading upward. The room is deafeningly loud with ' +
+      'an undetermined rushing sound. The sound seems to reverberate ' +
+      'from all of the walls, making it difficult even to think.',
+    dark: true,
+    exits: { east: 'dampCave', west: 'roundRoom', up: 'deepCanyon' },
+  },
+
+  dampCave: {
+    id: 'dampCave',
+    environment: 'underground',
+    name: 'Damp Cave',
+    text: 'This cave has exits to the west and east, and narrows to a crack toward the south. The earth is particularly damp here.',
+    dark: true,
+    exits: { west: 'loudRoom', east: null, south: null },
+    blockedExits: { south: 'It is too narrow for most insects.' },
+  },
+
+  // SW (no cardinal alt) mapped to west, pairing with North-South
+  // Passage's own east-to-here.
+  deepCanyon: {
+    id: 'deepCanyon',
+    environment: 'underground',
+    name: 'Deep Canyon',
+    text: 'You are on the south side of a deep canyon. The canyon runs to the northwest and the southeast; a small stream flows through it.',
+    dark: true,
+    exits: { east: 'damRoom', west: 'nsPassage', down: 'loudRoom' },
+  },
+
+  // Simplified: no LOW-TIDE reservoir-draining timer, so only two text
+  // states (closed/open) instead of canon's four. West (Reservoir
+  // South) is the reservoir/boat area, a separate large pass - omitted.
+  damRoom: {
+    id: 'damRoom',
+    environment: 'underground',
+    name: 'Dam',
+    text: (flags) =>
+      'You are standing on the top of the Flood Control Dam #3, which ' +
+      'was quite a tourist attraction in times far distant. There are ' +
+      'paths to the north, south, and west, and a scramble down.\n' +
+      (flags.gatesOpen
+        ? 'The sluice gates are open, and water rushes through the dam. ' +
+          'The water level behind the dam is still high.'
+        : 'The sluice gates on the dam are closed. Behind the dam, there ' +
+          'can be seen a wide reservoir. Water is pouring over the top ' +
+          'of the now abandoned dam.') +
+      '\nThere is a control panel here, on which a large metal bolt is ' +
+      'mounted. Directly above the bolt is a small green plastic bubble' +
+      (flags.gateFlag ? ' which is glowing serenely' : '') +
+      '.',
+    exits: { south: 'deepCanyon', down: 'damBase', east: 'damBase', north: 'damLobby' },
+  },
+
+  damLobby: {
+    id: 'damLobby',
+    environment: 'underground',
+    name: 'Dam Lobby',
+    text:
+      'This room appears to have been the waiting room for groups ' +
+      'touring the dam. There are open doorways here to the north and ' +
+      'east marked "Private", and there is a path leading south over ' +
+      'the top of the dam.',
+    exits: { south: 'damRoom', north: 'maintenanceRoom', east: 'maintenanceRoom' },
+  },
+
+  // No ONBIT in the source - genuinely dark, unlike the Dam Room/Lobby.
+  // The button panel's red button toggles this room's own lights in
+  // canon, independent of a carried lamp; not wired into the isDark
+  // engine here (see useGameState's pushButton), just tracked for text.
+  maintenanceRoom: {
+    id: 'maintenanceRoom',
+    environment: 'underground',
+    name: 'Maintenance Room',
+    text:
+      'This is what appears to have been the maintenance room for Flood ' +
+      'Control Dam #3. Apparently, this room has been ransacked ' +
+      'recently, for most of the valuable equipment is gone. On the ' +
+      'wall in front of you is a group of buttons colored blue, ' +
+      'yellow, brown, and red. There are doorways to the west and south.',
+    dark: true,
+    exits: { south: 'damLobby', west: 'damLobby' },
+  },
+
+  damBase: {
+    id: 'damBase',
+    environment: 'underground',
+    name: 'Dam Base',
+    text:
+      'You are at the base of Flood Control Dam #3, which looms above ' +
+      'you and to the north. The river Frigid is flowing by here. Along ' +
+      'the river are the White Cliffs which seem to form giant walls ' +
+      'stretching from north to south along the shores of the river as ' +
+      'it winds its way downstream.',
+    exits: { north: 'damRoom', up: 'damRoom' },
   },
 };

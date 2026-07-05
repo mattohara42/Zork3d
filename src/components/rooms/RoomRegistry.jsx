@@ -28,6 +28,17 @@ import GratingRoom from './GratingRoom';
 import CyclopsRoom from './CyclopsRoom';
 import StrangePassage from './StrangePassage';
 import TreasureRoom from './TreasureRoom';
+import EwPassage from './EwPassage';
+import RoundRoom from './RoundRoom';
+import NsPassage from './NsPassage';
+import ChasmRoom from './ChasmRoom';
+import LoudRoom from './LoudRoom';
+import DampCave from './DampCave';
+import DeepCanyon from './DeepCanyon';
+import DamRoom from './DamRoom';
+import DamLobby from './DamLobby';
+import MaintenanceRoom from './MaintenanceRoom';
+import DamBase from './DamBase';
 
 const MAZE_ROOM_IDS = [
   'maze1', 'maze2', 'maze3', 'maze4', 'maze5', 'maze6', 'maze7',
@@ -64,6 +75,17 @@ export const RoomRegistry = {
   cyclopsRoom: (props) => <CyclopsRoom {...props} />,
   strangePassage: (props) => <StrangePassage {...props} />,
   treasureRoom: (props) => <TreasureRoom {...props} />,
+  ewPassage: (props) => <EwPassage {...props} />,
+  roundRoom: (props) => <RoundRoom {...props} />,
+  nsPassage: (props) => <NsPassage {...props} />,
+  chasmRoom: (props) => <ChasmRoom {...props} />,
+  loudRoom: (props) => <LoudRoom {...props} />,
+  dampCave: (props) => <DampCave {...props} />,
+  deepCanyon: (props) => <DeepCanyon {...props} />,
+  damRoom: (props) => <DamRoom {...props} />,
+  damLobby: (props) => <DamLobby {...props} />,
+  maintenanceRoom: (props) => <MaintenanceRoom {...props} />,
+  damBase: (props) => <DamBase {...props} />,
   ...Object.fromEntries(
     MAZE_ROOM_IDS.map((id) => [id, (props) => <MazeRoom roomId={id} {...props} />])
   ),

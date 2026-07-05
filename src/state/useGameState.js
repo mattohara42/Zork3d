@@ -72,6 +72,15 @@ export function useGameState() {
     // path), and that one word sets both at once, so one flag suffices.
     cyclopsFled: false,
     treasureRoomVisited: false,
+    ewPassageVisited: false,
+    // Dam controls. gateFlag = the bubble's "greased and ready" state
+    // (yellow button primes it, brown button resets it) - turning the
+    // bolt only works while it's set. gatesOpen mirrors GATES-OPEN. The
+    // real LOW-TIDE reservoir-draining timer and the Loud Room's ECHO/
+    // platinum-bar puzzle aren't modeled - see PROJECT_STATUS.md.
+    gateFlag: false,
+    gatesOpen: false,
+    maintenanceLightsOn: false,
   });
   // Combat is only relevant to the Troll Room right now, so this is
   // simple top-level state rather than something threaded per-room.
@@ -270,6 +279,14 @@ export function useGameState() {
         }
         return;
       }
+      if (noun === 'dam' || noun === 'gate' || noun === 'gates') {
+        if (currentRoom !== 'damRoom') {
+          log("You don't see that here.");
+        } else {
+          log("Sounds reasonable, but this isn't how.");
+        }
+        return;
+      }
       log("You can't open that.");
     },
     [currentRoom, flags, items, log]
@@ -322,6 +339,14 @@ export function useGameState() {
         } else {
           setFlags((prev) => ({ ...prev, grateOpen: false }));
           log('The grating is closed.');
+        }
+        return;
+      }
+      if (noun === 'dam' || noun === 'gate' || noun === 'gates') {
+        if (currentRoom !== 'damRoom') {
+          log("You don't see that here.");
+        } else {
+          log("Sounds reasonable, but this isn't how.");
         }
         return;
       }
@@ -629,6 +654,60 @@ export function useGameState() {
     );
   }, [currentRoom, flags.cyclopsFled, log]);
 
+  /** Turning the bolt only works primed (gateFlag, via the yellow/brown
+   * buttons in the Maintenance Room) and with the wrench - matches
+   * BOLT-F's exact messages for both failure cases. */
+  const turnBolt = useCallback(() => {
+    if (currentRoom !== 'damRoom') {
+      log("You don't see that here.");
+      return;
+    }
+    if (!inventory.includes('wrench')) {
+      log("The bolt won't turn using your bare hands.");
+      return;
+    }
+    if (!flags.gateFlag) {
+      log("The bolt won't turn with your best effort.");
+      return;
+    }
+    setFlags((prev) => ({ ...prev, gatesOpen: !prev.gatesOpen }));
+    log(
+      flags.gatesOpen
+        ? 'The sluice gates close and water starts to collect behind the dam.'
+        : 'The sluice gates open and water pours through the dam.'
+    );
+  }, [currentRoom, inventory, flags.gateFlag, flags.gatesOpen, log]);
+
+  /**
+   * Yellow/brown "arm"/"disarm" the bolt (GATE-FLAG); red is a flavor-only
+   * light toggle for this one room (not wired into the isDark/lantern
+   * engine - see PROJECT_STATUS.md); blue's real leak/repair puzzle isn't
+   * modeled, so it's permanently "jammed" rather than half-implemented.
+   */
+  const pushButton = useCallback(
+    (noun) => {
+      if (currentRoom !== 'maintenanceRoom') {
+        log("You don't see that here.");
+        return;
+      }
+      if (noun.includes('yellow')) {
+        setFlags((prev) => ({ ...prev, gateFlag: true }));
+        log('Click.');
+      } else if (noun.includes('brown')) {
+        setFlags((prev) => ({ ...prev, gateFlag: false }));
+        log('Click.');
+      } else if (noun.includes('red')) {
+        setFlags((prev) => ({ ...prev, maintenanceLightsOn: !prev.maintenanceLightsOn }));
+        log(`The lights within the room ${flags.maintenanceLightsOn ? 'shut off.' : 'come on.'}`);
+      } else if (noun.includes('blue')) {
+        log('The blue button appears to be jammed.');
+      } else {
+        log("You can't push that.");
+      }
+    },
+    [currentRoom, flags.maintenanceLightsOn, log]
+  );
+
   const examineObject = useCallback(
     (noun) => {
       if (noun === 'mailbox') {
@@ -818,6 +897,8 @@ export function useGameState() {
         case 'attack': attackTroll(); break;
         case 'unlock': unlockGrate(); break;
         case 'lock': lockGrate(); break;
+        case 'turn': turnBolt(); break;
+        case 'push': pushButton(objectName); break;
         default: log('Nothing happens.');
       }
     },
@@ -832,6 +913,8 @@ export function useGameState() {
       attackTroll,
       unlockGrate,
       lockGrate,
+      turnBolt,
+      pushButton,
       log,
       incrementMoves,
     ]
@@ -906,8 +989,16 @@ export function useGameState() {
           break;
         }
         case 'move':
-        case 'push':
         case 'raise': incrementMoves(); moveObject(noun); break;
+        case 'push':
+          incrementMoves();
+          if (noun.includes('button')) {
+            pushButton(noun);
+          } else {
+            moveObject(noun);
+          }
+          break;
+        case 'turn': incrementMoves(); turnBolt(); break;
         case 'examine':
         case 'x':
         case 'look': incrementMoves(); examineObject(noun); break;
@@ -951,6 +1042,8 @@ export function useGameState() {
       unlockGrate,
       lockGrate,
       sayUlysses,
+      turnBolt,
+      pushButton,
       currentRoom,
       flags.cyclopsFled,
       incrementMoves,

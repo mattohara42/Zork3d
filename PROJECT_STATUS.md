@@ -35,6 +35,8 @@ Update this file when a decision or the room/item map changes meaningfully.
 | 23 | `open`/`close grate` work from either Grating Clearing or Grating Room once unlocked, but `lock`/`unlock` only work from Grating Room | Matches `GRATE-FUNCTION` exactly - it branches on `HERE` only for the lock verbs, not open/close. Modeled with the same room-data pattern already used elsewhere rather than a one-off special case |
 | 24 | Only the "ULYSSES" cyclops solution is built, not the source's alternate lunch/water sleep path | Both solutions unlock the Treasure Room, but only the word also breaks the wall to the Living Room shortcut - strictly the higher-value one to build first, and the alternate path needs its own items (`LUNCH`/`WATER`/`BOTTLE`) and a hunger-timer mechanic (`CYCLOWRATH`) better sequenced alongside the thief NPC |
 | 25 | Rooms can carry their own one-time score bonus via `onEnter`'s new `scoreBonus` field, awarded the same way an item's first-take `value` is | The Treasure Room has `VALUE 25` on the *room object* in the source, not an item - needed a small, generic extension rather than a one-off special case for this single room |
+| 26 | `blockedExits` values can now be a function of `flags`, not just a fixed string | The Chasm Room's `down` ("Are you out of your mind?") is fixed, but this mirrors how `text` already supported functions - kept the two hooks consistent rather than adding a one-off case |
+| 27 | Dam mechanics (`gateFlag`/`gatesOpen`) are two independent booleans, not one | `gateFlag` mirrors the green bubble's "primed" state (set/cleared by the yellow/brown buttons) and persists regardless of the gates themselves; `gatesOpen` mirrors `GATES-OPEN` and can only be toggled by `turn bolt` while primed. Matches the source's `BOLT-F`/`BUTTON-F` split exactly - priming and actuating are genuinely separate steps |
 
 **Standing engineering practice throughout:** every UI/behavior change in this
 project has been verified by actually running the app (`npm run dev` +
@@ -71,7 +73,7 @@ src/
 legacy-vanilla/index.html — superseded single-file prototype, kept for reference only
 ```
 
-### 2.3 Rooms implemented (47)
+### 2.3 Rooms implemented (58)
 
 | Room | Exits | Notable mechanics |
 |---|---|---|
@@ -83,7 +85,7 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 | Attic (dark) | down→Kitchen | Rope + knife (takeable); table (decorative, distinct text from Kitchen's) |
 | Living Room | E→Kitchen, W→Strange Passage (gated on "ULYSSES"), down→Cellar (gated) | Rug (`move rug` reveals trap door), trap door (open/close), trophy case (decorative), lamp + sword (takeable). The "nailed shut" door text swaps to a "cyclops-shaped opening" once the shortcut is open, matching `LIVING-ROOM-FCN` exactly |
 | Cellar (dark) | up→Living Room (gated, one-shot lock), N→Troll Room, S→East of Chasm, W(blocked: ramp) | Trap door slams shut + bars on first descent; lantern-lit once lamp is lit and carried |
-| Troll Room (dark) | S→Cellar, E(blocked, permanent for now - EW-Passage isn't built), W→Maze 1 (gated on defeating the troll) | Real combat via `attack`/`kill troll` (with or without the sword); winning removes the troll; losing bounces you to the Cellar (no death mechanic yet) |
+| Troll Room (dark) | S→Cellar, E→EW-Passage (gated on defeating the troll), W→Maze 1 (gated on defeating the troll) | Real combat via `attack`/`kill troll` (with or without the sword); winning removes the troll; losing bounces you to the Cellar (no death mechanic yet) |
 | East of Chasm (dark) | N→Cellar, E→Gallery, down(blocked: chasm) | Bottomless chasm sunk into the floor ahead; pushed back from the camera so the lantern still lights visible ground when carried lit (see §5) |
 | Gallery | W→East of Chasm, N→Studio | Has `ONBIT` in source — the one underground room that's naturally lit, so it uses the normal daylight rig instead of dark/lantern; painting (takeable) |
 | Studio (dark) | S→Gallery, up→Kitchen (gated, inventory-limited) | Owner's manual (takeable, readable); up-chimney to Kitchen requires carrying the lamp + at most one other item, and succeeding also un-bars the Cellar's trap door (§1 decision 16) |
@@ -104,8 +106,19 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 | Cyclops Room (dark) | W→Maze 15, E→Strange Passage (gated), up→Treasure Room (gated) | Both gated exits require saying `ULYSSES`/`ODYSSEUS` while the cyclops is present - the game's most famous shortcut. Only that word-puzzle solution is modeled, not the source's alternate lunch/water sleep path. Attacking gives the exact canon "shrugs off" response; the cyclops (`STRENGTH 10000`) isn't fightable |
 | Strange Passage (dark) | W/in→Cyclops Room, E→Living Room | Only reachable after the shortcut opens; the other end of the Living Room's west exit |
 | Treasure Room (dark) | down→Cyclops Room | The thief's hideaway - empty of loot since there's no thief NPC yet to stash anything. First visit awards a real one-time 25-point bonus (`VALUE 25` on the room itself in the source, not an item - see `onEnter`'s new `scoreBonus` field) |
+| East-West Passage (dark) | E→Round Room, W→Troll Room, N/down→Chasm Room | First visit awards a real one-time 5-point bonus (`VALUE 5` in the source). Canon's own `down`/`north` both lead to the Chasm Room, so no remapping needed |
+| Round Room (dark) | E→Loud Room, W→EW-Passage, N→NS-Passage, S(blocked: cave-ins) | Hub room. Canon's S/SE exits (Narrow Passage, Engravings Cave) lead into the Temple/Egyptian Room network, not built yet - S is blocked with the source's own "blocked by cave-ins" flavor rather than faked |
+| North-South Passage (dark) | N→Chasm Room, E→Deep Canyon, S→Round Room | Canon's NE (to Deep Canyon) has no cardinal alternative on this room, remapped to E |
+| Chasm (dark) | up→EW-Passage, S→NS-Passage, down(blocked: "Are you out of your mind?") | Canon's SW (to EW-Passage) duplicates the existing `up` exit to the same room, so it's dropped rather than remapped; canon's NE (Reservoir South) isn't built yet, omitted rather than faked |
+| Loud Room (dark) | E→Damp Cave, W→Round Room, up→Deep Canyon | Simplified: no `LOW-TIDE` reservoir-draining timer or `ECHO`/platinum-bar puzzle - the room reads as permanently loud rather than modeling the quiet/loud cycle |
+| Damp Cave (dark) | W→Loud Room, E(blocked: not built), S(blocked: "too narrow for most insects") | Canon's E leads to White Cliffs/river-boat area, not built yet - blocked with a generic message rather than the source's own (which assumes the river network exists) |
+| Deep Canyon (dark) | E→Dam Room, W→NS-Passage, down→Loud Room | Canon's NW (Reservoir South) isn't built yet, omitted rather than faked |
+| Dam | S→Deep Canyon, down/E→Dam Base, N→Dam Lobby | `ONBIT` in source - naturally lit like the Gallery. The control panel's bolt is clickable (`turn bolt`); text swaps between open/closed sluice-gate description and shows the green bubble "glowing serenely" once primed (`flags.gateFlag`). Canon's W (Reservoir South) isn't built yet, omitted |
+| Dam Lobby | S→Dam Room, N/E→Maintenance Room | `ONBIT` in source - naturally lit |
+| Maintenance Room (dark) | S/W→Dam Lobby | No `ONBIT` - genuinely dark, unlike its neighbors. Four clickable buttons (`push <color> button`): yellow primes the bolt (`gateFlag`), brown resets it, red toggles the room's own lights (flavor-only, not wired into the lighting engine), blue is permanently "jammed" (the source's leak/repair puzzle isn't modeled). Wrench (takeable) needed to `turn` the dam's bolt |
+| Dam Base | N/up→Dam Room | `ONBIT` in source. The Frigid River/boat/Atlantis Room network beyond isn't modeled |
 
-### 2.4 Items implemented (10)
+### 2.4 Items implemented (11)
 - **leaflet** — starts in mailbox; readable ("WELCOME TO ZORK!..." — verbatim source text)
 - **lamp** (brass lantern) — Living Room; light source; `light lamp`/`turn off lamp` requires carrying it
 - **sword** (elvish, antique) — Living Room; takeable; no combat use yet
@@ -116,10 +129,11 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 - **egg** — Up a Tree (in the nest); takeable, a real treasure (value 5, tvalue 5); `put egg in case` scores it. The source's fragility mechanic (breaks if opened/dropped carelessly, tied into the thief NPC) is not modeled — plain take/examine/put only
 - **leaves** — Grating Clearing; `move`/`take` reveals the grate underneath (canon's `burn`/`look under` triggers aren't modeled since this game has no `burn`/`look under` verb for anything yet, not just here)
 - **keys** ("key") — Maze-5, beside the skeleton; takeable, needed to `unlock` the grate from the Grating Room side
+- **wrench** — Maintenance Room; takeable, needed to `turn` the dam's bolt (bare hands don't work)
 
 ### 2.5 Verbs / commands
 - Movement: `north/south/east/west/up/down` (+ `n/s/e/w/u/d`), `in`/`enter`, `out`/`leave`; WASD + arrow keys
-- Objects: `open`, `close`, `take`/`get`, `drop`, `put <thing> in/on <container>` (trophy case only), `move`/`push`/`raise` (rug and leaves only), `examine`/`x`, `read`, `attack`/`kill`/`hit`/`fight` (the troll only), `lock`/`unlock` (the grate only)
+- Objects: `open`, `close`, `take`/`get`, `drop`, `put <thing> in/on <container>` (trophy case only), `move`/`raise` (rug and leaves only), `push <color> button` (Maintenance Room only), `turn bolt` (Dam Room only, requires the wrench), `examine`/`x`, `read`, `attack`/`kill`/`hit`/`fight` (the troll only), `lock`/`unlock` (the grate only)
 - Meta: `look`, `inventory`/`i`/`inv`, `help`, `score`, `light lamp`/`turn on lamp`, `turn off lamp`/`extinguish lamp`/`douse lamp`, `ulysses`/`odysseus` (deliberately not listed in `help` - it's a discoverable secret in canon too)
 - Click-to-interact on: mailbox, window, rug, trap door, lamp, sword, trophy case, troll, leaves, grate (both sides), skeleton key (hover shows an `<Html>` label; click fires the same handler as the equivalent typed verb). Depositing into the case, unlocking the grate, and the "ULYSSES" word are typed-only — the word puzzle has no object to click at all
 
@@ -135,6 +149,8 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 - Combat odds are a simplified fixed-probability stand-in for the source's strength-table lookup (§1 decision 19); losing a fight bounces you to the Cellar instead of a real death (§1 decision 20); the troll's disarmed state isn't reflected in the room's static text, only in the combat log itself
 - `put` only understands the trophy case as a destination — there's no generic container system, since the case is the only real "put things in X" interaction in the game so far
 - `moves` counts one turn per action across nearly every verb, rather than exactly matching which specific verbs consume a turn in the original engine (`look`/`inventory`/`help`/`score` are free here, matching the original's own informational commands; finer-grained exceptions beyond that aren't modeled)
+- The dam area omits several real sub-puzzles: the `LOW-TIDE` reservoir-draining timer (Loud Room reads as permanently loud rather than cycling quiet/loud), the Loud Room's `ECHO`/platinum-bar puzzle, the blue button's leak/repair mechanic (permanently "jammed" instead), and the Reservoir/boat/Atlantis River network beyond Dam Base - all deferred as their own follow-up scope
+- The red button's room-lights toggle (Maintenance Room) is flavor text only, not wired into the `isDark`/`isUnderground` lighting engine - the room's actual visibility still depends solely on the carried lamp
 
 ---
 
@@ -148,7 +164,7 @@ room text or mechanics from memory.
 1. ~~**Attic** (Kitchen `up`) and **Studio**~~ — done. Turned out Kitchen's `down` (chimney) is a permanent dead end in canon, so Studio's only real entrance is Kitchen→...→Living Room→Cellar→East of Chasm→Gallery→Studio; built all four rooms on that path for real reachability (user-confirmed scope)
 2. ~~**Forest rooms** around the house~~ — done. `Forest1/2/3`, `Mountains`, `Path`, `UpATree`, `GratingClearing`, `Clearing`, wired to West/North/South/Behind House exactly on their canonical cardinal exits. The nest + jewel-encrusted egg (a real early treasure/puzzle) live in Up a Tree
 3. ~~**Canyon View / Cliff Middle / Canyon Bottom / End of Rainbow**~~ (Clearing `east`) — done. The rainbow crossing (Aragain Falls, On the Rainbow, the invisible pot-of-gold treasure) needs the sceptre puzzle first — not built, left as a visible-but-uncrossable flavor rainbow rather than a fake exit
-4. **The dam area** (reservoir, dam room/lobby/base) — reachable a different way (via the river/Dam Room, not yet connected to anything we've built), holds its own multi-step puzzle (wrench + bolt to drain the reservoir); bigger than the pure-geography passes so far, scope it separately
+4. ~~**The dam area**~~ (reservoir, dam room/lobby/base) — done. Reaching it needed the EW-Passage/Round Room hub built first (Troll Room's east exit, gated on defeating the troll): EW-Passage, Round Room, NS-Passage, Chasm Room, Loud Room, Damp Cave, Deep Canyon, then Dam Room/Lobby/Maintenance Room/Dam Base. The wrench + bolt + yellow/brown button mechanic (`turnBolt`/`pushButton` in `useGameState`) toggles the sluice gates and swaps the Dam Room's text; the real `LOW-TIDE` timer, Loud Room's `ECHO` puzzle, and the blue button's leak/repair mechanic are deferred (see §2.6)
 5. ~~**Trophy case scoring**~~ — done. `score`/`moves` state added to `useGameState`; `put <treasure> in case` deposits (typed-only, no click affordance yet), taking it back out un-scores it, `score` verb prints the verbatim V-SCORE text/rank thresholds. Fetched `gverbs.zil`/`gmain.zil` (not previously cached) to find `SCORE-UPD`/`BASE-SCORE`/`SCORE-OBJ`, since they're generic-engine routines, not in `1actions.zil`/`1dungeon.zil`
 6. ~~**The Maze**~~ (Troll Room `west`) — done. All 15 numbered rooms, 4 dead ends, and the Grating Room, wired exactly per `MAZE-DIODES`/each `ROOM` definition. *Correction*: earlier notes here said this was reachable without combat via the grate - re-reading `GRATE-FUNCTION` showed that's backwards, the grate can only be unlocked from *inside* the maze (a skeleton key found at Maze-5), so it's an exit shortcut you earn, not an entrance. The Troll Room really was the only way in
 7. ~~**Grate/leaf-clearing puzzle**~~ — done. `move`/`take leaves` at Grating Clearing reveals the grate; the skeleton key at Maze-5 unlocks it from the Grating Room side only (`unlock`/`lock` there, `open`/`close` from either side once unlocked) - a real second way in/out of the maze, verified live including the leaf-reveal-from-below case and both "wrong side" refusal messages
@@ -224,6 +240,15 @@ trilogy-wide generic verb, not Zork I-specific), `OBJECT CYCLOPS`,
 Room's west neighbor) that the Living Room's "nailed shut" door was
 never actually permanent in canon - `LIVING-ROOM-FCN`'s `MAGIC-FLAG`
 branch swaps its text for the cyclops-shaped-opening description.
+Dam/hub: `EW-PASSAGE`, `ROUND-ROOM`, `NORTH-SOUTH-PASSAGE` (`NS-PASSAGE`
+in `rooms.js`), `CHASM-ROOM`, `LOUD-ROOM`/`LOUD-ROOM-FCN`, `DAMP-CAVE`,
+`DEEP-CANYON`/`DEEP-CANYON-F`, `DAM-ROOM`/`DAM-ROOM-FCN`, `DAM-LOBBY`,
+`MAINTENANCE-ROOM`, `DAM-BASE`, `BOLT-F`, `BUTTON-F` (`1dungeon.zil`/
+`1actions.zil`) — confirmed each room's exact `FLAGS` (which are
+`RLANDBIT` only vs. `RLANDBIT ONBIT`) to get dark/lit status right;
+caught and fixed two rooms (`LOUD-ROOM`, `DEEP-CANYON`) that were
+missed as naturally lit on first pass but are actually dark like the
+rest of the hub (see §5).
 
 ---
 
@@ -239,6 +264,8 @@ they aren't repeated:
 - **`light lamp` didn't actually require possession** in its first pass — gated on "reachable" (same room OR inventory) instead of "carried", which let the player light it while it was still sitting on the trophy case.
 - **East of Chasm looked pitch black even with the lamp lit.** The chasm pit (intentionally pure-black geometry) sat right at the edge of the lantern's cone and filled almost the entire forward view, so a mechanically-correct "lit" room was visually indistinguishable from `isDark`. Caught by sampling pixel RGB values (all `(0,0,0)`) rather than trusting the screenshot at a glance; fixed by moving the pit further from the camera so there's visible lit ground in front of it.
 - **Ground-level objects placed too close to the camera render completely off-screen**, not just small. The fixed camera looks perfectly horizontal and never tilts down, so anything at `GROUND_Y` closer than roughly `z=-2.8` falls below the bottom edge of the frustum entirely. Hit this twice: the dropped leaflet at `z=-2` in West of House, and would have hit it again with the egg/nest in Up a Tree had it not been placed at `z=-3.6` from the start. Rule of thumb: keep ground-level props at `z ≤ -3` unless they have enough height to straddle the cutoff (like the mailbox or a torus-shaped item).
+- **The opposite frustum bug: a tall wall placed too close fills the *entire* screen**, blotting out both the sky/background and the floor - not just cropped, completely invisible geometry from the player's perspective. The Dam Room's back wall (height 6 at `z=-4`) did exactly this; a naturally-lit room rendered as a near-solid gray screen with only a small clickable fixture floating in it, which looked identical to "nothing is rendering" until pixel-sampled and compared against a wall that deliberately used pure debug colors (red/magenta) to confirm the geometry *was* there, just filling the frame. Fixed by matching the already-working Deep Canyon proportions (`height ≈ 5` at `z=-6`). Rule of thumb: for a wall spanning most of the room's width, keep `2 × |z| × tan(30°)` comfortably above the wall's height, not just above zero.
+- **A dark room with no geometry near the camera reads as pitch black even when correctly lit by the lantern.** `LanternLight` is a point light with real inverse-square falloff (`decay={2}`), so a bare `Ground` plane with no walls within a few units of the camera receives essentially no visible light - the near part of the floor is out of frustum (see the bug above) and the far part is too dim to register. Existing dark rooms without close geometry (`EastOfChasm`) already ship this way and it's accepted as "very dark, as intended," but new dark rooms should still put *something* (a side wall, a rock, a fixture) within roughly 2-4 units of the camera if it's meant to be legible at all, matching how the Maze's rock scattering or NS-Passage's `x=±2` walls do it.
 
 ---
 

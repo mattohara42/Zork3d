@@ -131,4 +131,15 @@ export const INITIAL_ITEMS = {
     portable: true,
     location: 'maze5',
   },
+
+  // No FDESC/LDESC on WRENCH either - same generic fallback pattern as
+  // the keys.
+  wrench: {
+    id: 'wrench',
+    name: 'wrench',
+    description: 'A wrench.',
+    floorText: 'There is a wrench here.',
+    portable: true,
+    location: 'maintenanceRoom',
+  },
 };
