@@ -121,7 +121,7 @@ room text or mechanics from memory.
 7. **Score/turn counter + `score`/`diagnose` verbs**
 8. **Save/restore** — no persistence at all currently; page refresh loses all state
 9. **Light source depletion** — the lamp is a battery lantern with finite life in the original; currently it never runs out
-10. **Death mechanic** — "likely to be eaten by a grue" is flavor text only right now; there's no actual grue encounter or death/restart flow when lingering in the dark
+10. **Death mechanic** — "likely to be eaten by a grue" is flavor text only right now; there's no actual grue encounter or death/restart flow when lingering in the dark. Explicitly considered and declined once already: an instant Game Over the moment you *enter* any dark room without the lamp lit. Rejected because (a) the original never kills you on the first dark step — it warns, and only risks a probabilistic grue death if you keep acting while still in the dark, and (b) there's no Game Over screen/restart flow to land on yet. Build the real staged version here, not a shortcut bolted onto room transitions
 
 ### Housekeeping / non-gameplay
 11. No automated test suite — all verification so far has been manual (Playwright driven live-browser checks per change, not committed as regression tests)
