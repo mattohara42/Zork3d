@@ -79,12 +79,13 @@ export const INITIAL_ITEMS = {
     location: 'gallery',
   },
 
-  // Real EGG-OBJECT in the source lets the egg get "seriously damaged" if
-  // opened/dropped carelessly (a whole fragility/condition mechanic tied
-  // into the thief NPC who can open it safely later). Not modeled yet -
-  // this is just a plain takeable treasure for now, same simplification
-  // already applied to the painting (no condition tracking, scoring
-  // aside).
+  // EGG-OBJECT: opening it yourself either refuses ("neither the tools
+  // nor the expertise" - no knife) or damages it (with the knife); the
+  // only way to open it undamaged is to give it to the thief and let him
+  // die holding it (see useGameState's giveItem/attackThief - mirrors
+  // DEPOSIT-BOOTY setting EGG-SOLVE). `broken`, once true, means the
+  // egg's own fields below have been mutated in place to the source's
+  // BROKEN-EGG stats/text rather than swapping to a separate item id.
   egg: {
     id: 'egg',
     name: 'egg',
@@ -95,6 +96,25 @@ export const INITIAL_ITEMS = {
     value: 5,
     tvalue: 5,
     location: 'upATree',
+    broken: false,
+  },
+
+  // Starts hidden inside the egg (location 'insideEgg' is never a real
+  // room, so it's unreachable) until the egg is opened one way or the
+  // other, at which point its location is set to wherever the egg is.
+  // The source's follow-on WIND-CANARY/forest-bird/bauble chain isn't
+  // modeled - see PROJECT_STATUS.md.
+  canary: {
+    id: 'canary',
+    name: 'canary',
+    description: 'A golden clockwork canary.',
+    floorText:
+      'There is a golden clockwork canary nestled in the egg. It has ruby eyes and a silver beak.',
+    portable: true,
+    value: 6,
+    tvalue: 4,
+    location: 'insideEgg',
+    broken: false,
   },
 
   ownersManual: {

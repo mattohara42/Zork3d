@@ -50,8 +50,9 @@ const LAMP_OFF_COMMANDS = ['turn off lamp', 'extinguish lamp', 'douse lamp'];
 const HELP_TEXT =
   'Commands: north/south/east/west/up/down/in/out (or n/s/e/w/u/d), look, ' +
   'examine <thing>, open/close <thing>, lock/unlock <thing>, take/drop ' +
-  '<thing>, put <thing> in case, read <thing>, move <thing>, attack/kill ' +
-  '<thing>, inventory, score, light lamp / turn off lamp, save, restore, restart.';
+  '<thing>, put <thing> in case, give <thing> to <someone>, read <thing>, ' +
+  'move <thing>, attack/kill <thing>, inventory, score, light lamp / turn ' +
+  'off lamp, save, restore, restart.';
 
 function resolveRoomText(room, flags, items, currentRoom) {
   const base = typeof room.text === 'function' ? room.text(flags) : room.text;
@@ -92,6 +93,10 @@ const INITIAL_FLAGS = {
   // always sits in the Treasure Room rather than roaming the whole map
   // and stealing from other rooms (see PROJECT_STATUS.md).
   thiefDefeated: false,
+  // EGG-SOLVE: set when the thief dies while holding the egg (given to
+  // him beforehand via `give egg to thief`) - the only way to open it
+  // without damaging it.
+  eggOpenedSafely: false,
 };
 
 /**
@@ -515,9 +520,58 @@ export function useGameState() {
         }
         return;
       }
+      if (noun === 'egg') {
+        if (!isItemReachable(items.egg)) {
+          log("You don't see that here.");
+        } else if (items.egg.broken || flags.eggOpenedSafely) {
+          log('The egg is already open.');
+        } else if (inventory.includes('knife')) {
+          // EGG-OBJECT: opening it with a tool/weapon works, but damages
+          // it - mirrors BAD-EGG mutating in the egg (and canary, if it's
+          // still inside) to their "broken" stats/text in place.
+          log(
+            'Your rather indelicate handling of the egg with the knife has caused it some damage, although you have succeeded in opening it.'
+          );
+          setItems((prev) => {
+            const next = {
+              ...prev,
+              egg: {
+                ...prev.egg,
+                broken: true,
+                value: 0,
+                tvalue: 2,
+                description: 'A somewhat ruined egg.',
+                floorText: 'There is a somewhat ruined egg here.',
+              },
+            };
+            if (prev.canary.location === 'insideEgg') {
+              next.canary = {
+                ...prev.canary,
+                location: prev.egg.location,
+                broken: true,
+                value: 0,
+                tvalue: 1,
+                description: 'A broken clockwork canary.',
+                floorText:
+                  'There is a golden clockwork canary nestled in the egg. It seems to have recently had a bad experience.',
+              };
+            }
+            return next;
+          });
+          // If the egg was being carried, the canary falls out into your
+          // hands too - keep the inventory array in sync with the
+          // location field it's otherwise driven by (see takeItem).
+          if (items.egg.location === 'inventory' && items.canary.location === 'insideEgg') {
+            setInventory((prev) => [...prev, 'canary']);
+          }
+        } else {
+          log('You have neither the tools nor the expertise to open it without damaging it.');
+        }
+        return;
+      }
       log("You can't open that.");
     },
-    [currentRoom, flags, items, log]
+    [currentRoom, flags, items, inventory, isItemReachable, log]
   );
 
   const closeObject = useCallback(
@@ -719,6 +773,42 @@ export function useGameState() {
     [findItemByName, currentRoom, log]
   );
 
+  /**
+   * The thief is the only "give" recipient in this game - mirrors
+   * ROBBER-FUNCTION's GIVE/THROW branch: he admires a real treasure
+   * ("stops to admire its beauty") or just pockets anything else
+   * ("thanks you politely"). Giving him the egg and later killing him
+   * (see attackThief) is the only way to open it undamaged.
+   */
+  const giveItem = useCallback(
+    (noun, recipientNoun) => {
+      if (!['thief', 'robber', 'man', 'person'].includes(recipientNoun)) {
+        log("You can't give that to anyone here.");
+        return;
+      }
+      if (currentRoom !== 'treasureRoom' || flags.thiefDefeated) {
+        log("There's no one here to give that to.");
+        return;
+      }
+      const item = findItemByName(noun);
+      if (!item || item.location !== 'inventory') {
+        log("You don't have that.");
+        return;
+      }
+      setItems((prev) => ({
+        ...prev,
+        [item.id]: { ...prev[item.id], location: 'thief' },
+      }));
+      setInventory((prev) => prev.filter((id) => id !== item.id));
+      log(
+        item.tvalue
+          ? `The thief is taken aback by your unexpected generosity, but accepts the ${item.name} and stops to admire its beauty.`
+          : `The thief places the ${item.name} in his bag and thanks you politely.`
+      );
+    },
+    [currentRoom, flags.thiefDefeated, findItemByName, log]
+  );
+
   /** "move"/"push" the rug, revealing the trap door underneath - one-shot. */
   const moveObject = useCallback(
     (noun) => {
@@ -890,6 +980,37 @@ export function useGameState() {
       log(randomPick(HERO_KILL('the thief')));
       setFlags((prev) => ({ ...prev, thiefDefeated: true }));
       setThiefHealth(0);
+
+      // DEPOSIT-BOOTY: anything given to him (see giveItem) reappears in
+      // the Treasure Room now that he's dead. If it was the egg, and it's
+      // still undamaged, this is EGG-SOLVE - the only way to open it
+      // without breaking it.
+      const heldByThief = Object.values(items).filter((item) => item.location === 'thief');
+      if (heldByThief.length > 0) {
+        log('As the thief dies, the power of his magic decreases, and his treasures reappear.');
+        const gaveUnbrokenEgg = heldByThief.some((item) => item.id === 'egg') && !items.egg.broken;
+        setItems((prev) => {
+          const next = { ...prev };
+          for (const item of heldByThief) {
+            next[item.id] = { ...next[item.id], location: 'treasureRoom' };
+          }
+          if (gaveUnbrokenEgg) {
+            // The FDESC ("In the bird's nest...") only makes sense back
+            // at Up a Tree - once it reappears here, it needs the same
+            // generic-fallback floor line the source's engine would show
+            // for any object away from its original home.
+            next.egg = { ...next.egg, floorText: 'There is a jewel-encrusted egg here, open and undamaged.' };
+            if (prev.canary.location === 'insideEgg') {
+              next.canary = { ...next.canary, location: 'treasureRoom' };
+            }
+          }
+          return next;
+        });
+        if (gaveUnbrokenEgg) {
+          setFlags((prev) => ({ ...prev, eggOpenedSafely: true }));
+          log('The egg is now open, undamaged, with a golden clockwork canary nestled inside.');
+        }
+      }
       return;
     }
     setThiefHealth(nextHealth);
@@ -919,7 +1040,7 @@ export function useGameState() {
         setPlayerHealth(nextPlayerHealth);
       }
     }
-  }, [currentRoom, flags.thiefDefeated, inventory, thiefHealth, thiefDisarmed, playerHealth, log, moveRoom]);
+  }, [currentRoom, flags.thiefDefeated, inventory, thiefHealth, thiefDisarmed, playerHealth, items, log, moveRoom]);
 
   /**
    * The grate can only be unlocked/locked from the Grating Room side
@@ -1378,6 +1499,19 @@ export function useGameState() {
           putItem(match[1].trim(), match[2].trim().replace(/^the\s+/, ''));
           break;
         }
+        case 'give': {
+          incrementMoves();
+          const match = noun.match(/^(.*?)\s+to\s+(.*)$/);
+          if (!match) {
+            log('Give it to whom?');
+            break;
+          }
+          giveItem(
+            match[1].trim().replace(/^the\s+/, ''),
+            match[2].trim().replace(/^the\s+/, '')
+          );
+          break;
+        }
         case 'move':
         case 'raise': incrementMoves(); moveObject(noun); break;
         case 'push':
@@ -1430,6 +1564,7 @@ export function useGameState() {
       takeItem,
       dropItem,
       putItem,
+      giveItem,
       moveObject,
       examineObject,
       readItem,

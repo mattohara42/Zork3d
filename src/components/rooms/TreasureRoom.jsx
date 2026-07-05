@@ -91,6 +91,36 @@ function Chalice({ onInteract }) {
   );
 }
 
+// Only ever shows up here once the thief has died holding the egg (the
+// only way to open it undamaged - see useGameState's attackThief).
+function Canary({ onInteract }) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <group position={[0.6, GROUND_Y + 0.15, -3.4]}>
+      <mesh
+        onClick={(e) => {
+          e.stopPropagation();
+          onInteract('canary', 'take');
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHovered(true);
+          document.body.style.cursor = 'pointer';
+        }}
+        onPointerOut={() => {
+          setHovered(false);
+          document.body.style.cursor = 'auto';
+        }}
+      >
+        <sphereGeometry args={[0.12, 10, 10]} />
+        <meshStandardMaterial color={hovered ? '#ffe680' : '#d4af37'} />
+      </mesh>
+      <ObjectLabel text="canary" visible={hovered} position={[0, 0.35, 0]} />
+    </group>
+  );
+}
+
 export default function TreasureRoom({ flags, items, onInteract }) {
   return (
     <group>
@@ -103,6 +133,7 @@ export default function TreasureRoom({ flags, items, onInteract }) {
       <Bag position={[2, GROUND_Y + 0.2, -3.3]} />
       {!flags.thiefDefeated && <Thief onInteract={onInteract} />}
       {items.chalice.location === 'treasureRoom' && <Chalice onInteract={onInteract} />}
+      {items.canary.location === 'treasureRoom' && <Canary onInteract={onInteract} />}
     </group>
   );
 }
