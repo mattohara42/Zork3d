@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { GROUND_Y } from './Ground';
+import ObjectLabel from './ObjectLabel';
 
 const X = 2;
 const Z = -3;
@@ -54,6 +55,8 @@ export default function Mailbox({ open, hasLeaflet, onInteract }) {
           <meshStandardMaterial color="#ffffff" />
         </mesh>
       )}
+
+      <ObjectLabel text="mailbox" visible={hovered} position={[X, GROUND_Y + 1.5, Z]} />
     </group>
   );
 }

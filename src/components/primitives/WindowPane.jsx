@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { GROUND_Y } from './Ground';
 import { HOUSE_Z } from './HouseShell';
+import ObjectLabel from './ObjectLabel';
 
 // HouseShell's box is centered at HOUSE_Z with depth 5, so its near face
 // (the one facing the camera) sits at HOUSE_Z + 5/2. Placing the pane at
@@ -18,26 +19,30 @@ export default function WindowPane({ open, onInteract }) {
   const [hovered, setHovered] = useState(false);
 
   return (
-    <mesh
-      position={[1.2, WINDOW_HEIGHT, WINDOW_Z]}
-      onClick={(e) => {
-        e.stopPropagation();
-        onInteract('window', open ? 'close' : 'open');
-      }}
-      onPointerOver={(e) => {
-        e.stopPropagation();
-        setHovered(true);
-        document.body.style.cursor = 'pointer';
-      }}
-      onPointerOut={() => {
-        setHovered(false);
-        document.body.style.cursor = 'auto';
-      }}
-    >
-      <planeGeometry args={[1, 1.2]} />
-      <meshStandardMaterial
-        color={open ? '#1a1a1a' : hovered ? '#d8f0f8' : '#bfe3f0'}
-      />
-    </mesh>
+    <group>
+      <mesh
+        position={[1.2, WINDOW_HEIGHT, WINDOW_Z]}
+        onClick={(e) => {
+          e.stopPropagation();
+          onInteract('window', open ? 'close' : 'open');
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHovered(true);
+          document.body.style.cursor = 'pointer';
+        }}
+        onPointerOut={() => {
+          setHovered(false);
+          document.body.style.cursor = 'auto';
+        }}
+      >
+        <planeGeometry args={[1, 1.2]} />
+        <meshStandardMaterial
+          color={open ? '#1a1a1a' : hovered ? '#d8f0f8' : '#bfe3f0'}
+        />
+      </mesh>
+
+      <ObjectLabel text="window" visible={hovered} position={[1.2, WINDOW_HEIGHT + 0.9, WINDOW_Z]} />
+    </group>
   );
 }
