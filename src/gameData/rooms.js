@@ -35,7 +35,7 @@ export const ROOMS = {
     environment: 'surface',
     name: 'West of House',
     text: 'You are standing in an open field west of a white house, with a boarded front door. There is a small mailbox here.',
-    exits: { north: 'northOfHouse', south: 'southOfHouse', east: null },
+    exits: { north: 'northOfHouse', south: 'southOfHouse', east: null, west: 'forest1' },
   },
 
   northOfHouse: {
@@ -43,7 +43,7 @@ export const ROOMS = {
     environment: 'surface',
     name: 'North of House',
     text: 'You are facing the north side of a white house. There is no door here, and all the windows are boarded up. To the north a narrow path winds through the trees.',
-    exits: { south: 'westOfHouse', east: 'behindHouse' },
+    exits: { south: 'westOfHouse', east: 'behindHouse', north: 'path' },
   },
 
   southOfHouse: {
@@ -51,7 +51,7 @@ export const ROOMS = {
     environment: 'surface',
     name: 'South of House',
     text: 'You are facing the south side of a white house. There is no door here, and all the windows are boarded.',
-    exits: { north: 'westOfHouse', east: 'behindHouse' },
+    exits: { north: 'westOfHouse', east: 'behindHouse', south: 'forest3' },
   },
 
   behindHouse: {
@@ -59,7 +59,7 @@ export const ROOMS = {
     environment: 'surface',
     name: 'Behind House',
     text: 'You are behind the white house. In one corner of the house there is a small window which is slightly ajar.',
-    exits: { west: 'northOfHouse', south: 'southOfHouse', in: 'kitchen' },
+    exits: { west: 'northOfHouse', south: 'southOfHouse', in: 'kitchen', east: 'clearing' },
     exitGuards: {
       in: (flags) =>
         flags.windowOpen ? null : 'The window is not open wide enough to enter.',
@@ -212,5 +212,98 @@ export const ROOMS = {
         return "You can't get up there with what you're carrying.";
       },
     },
+  },
+
+  forest1: {
+    id: 'forest1',
+    environment: 'surface',
+    name: 'Forest',
+    text: 'This is a forest, with trees in all directions. To the east, there appears to be sunlight.',
+    exits: { north: 'gratingClearing', east: 'path', south: 'forest3', west: null, up: null },
+    blockedExits: {
+      west: 'You would need a machete to go further west.',
+      up: 'There is no tree here suitable for climbing.',
+    },
+  },
+
+  forest2: {
+    id: 'forest2',
+    environment: 'surface',
+    name: 'Forest',
+    text: 'This is a dimly lit forest, with large trees all around.',
+    exits: { north: null, east: 'mountains', south: 'clearing', west: 'path', up: null },
+    blockedExits: {
+      north: 'The forest becomes impenetrable to the north.',
+      up: 'There is no tree here suitable for climbing.',
+    },
+  },
+
+  forest3: {
+    id: 'forest3',
+    environment: 'surface',
+    name: 'Forest',
+    text: 'This is a dimly lit forest, with large trees all around.',
+    exits: { north: 'clearing', east: null, south: null, west: 'forest1', up: null },
+    blockedExits: {
+      east: 'The rank undergrowth prevents eastward movement.',
+      south: 'Storm-tossed trees block your way.',
+      up: 'There is no tree here suitable for climbing.',
+    },
+  },
+
+  mountains: {
+    id: 'mountains',
+    environment: 'surface',
+    name: 'Forest',
+    text: 'The forest thins out, revealing impassable mountains.',
+    exits: { north: 'forest2', south: 'forest2', west: 'forest2', east: null, up: null },
+    blockedExits: {
+      east: 'The mountains are impassable.',
+      up: 'The mountains are impassable.',
+    },
+  },
+
+  path: {
+    id: 'path',
+    environment: 'surface',
+    name: 'Forest Path',
+    text:
+      'This is a path winding through a dimly lit forest. The path heads ' +
+      'north-south here. One particularly large tree with some low branches ' +
+      'stands at the edge of the path.',
+    exits: { up: 'upATree', north: 'gratingClearing', east: 'forest2', south: 'northOfHouse', west: 'forest1' },
+  },
+
+  upATree: {
+    id: 'upATree',
+    environment: 'surface',
+    name: 'Up a Tree',
+    text:
+      'You are about 10 feet above the ground nestled among some large ' +
+      'branches. The nearest branch above you is above your reach.',
+    exits: { down: 'path', up: null },
+    blockedExits: { up: 'You cannot climb any higher.' },
+  },
+
+  // Same displayed name as `clearing` below (both are literally "Clearing"
+  // in the source, distinguished only by description/exits) - the grate
+  // here is real in canon but hidden until a leaf-clearing puzzle we
+  // haven't built yet, so `down` stays a generic block for now rather than
+  // a fabricated permanent one.
+  gratingClearing: {
+    id: 'gratingClearing',
+    environment: 'surface',
+    name: 'Clearing',
+    text: 'You are in a clearing, with a forest surrounding you on all sides. A path leads south.',
+    exits: { east: 'forest2', west: 'forest1', south: 'path', north: null, down: null },
+    blockedExits: { north: 'The forest becomes impenetrable to the north.' },
+  },
+
+  clearing: {
+    id: 'clearing',
+    environment: 'surface',
+    name: 'Clearing',
+    text: 'You are in a small clearing in a well marked forest path that extends to the east and west.',
+    exits: { east: null, north: 'forest2', south: 'forest3', west: 'behindHouse', up: null },
   },
 };

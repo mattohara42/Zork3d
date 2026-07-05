@@ -67,6 +67,21 @@ export const INITIAL_ITEMS = {
     location: 'gallery',
   },
 
+  // Real EGG-OBJECT in the source lets the egg get "seriously damaged" if
+  // opened/dropped carelessly (a whole fragility/condition mechanic tied
+  // into the thief NPC who can open it safely later). Not modeled yet -
+  // this is just a plain takeable treasure for now, same simplification
+  // already applied to the painting (no scoring/condition tracking).
+  egg: {
+    id: 'egg',
+    name: 'egg',
+    description: 'A jewel-encrusted egg.',
+    floorText:
+      "In the bird's nest is a large egg encrusted with precious jewels, apparently scavenged by a childless songbird. The egg is covered with fine gold inlay, and ornamented in lapis lazuli and mother-of-pearl. Unlike most eggs, this one is hinged and closed with a delicate looking clasp. The egg appears extremely fragile.",
+    portable: true,
+    location: 'upATree',
+  },
+
   ownersManual: {
     id: 'ownersManual',
     name: 'manual',
