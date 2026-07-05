@@ -51,7 +51,7 @@ const HELP_TEXT =
   'Commands: north/south/east/west/up/down/in/out (or n/s/e/w/u/d), look, ' +
   'examine <thing>, open/close <thing>, lock/unlock <thing>, take/drop ' +
   '<thing>, put <thing> in case, read <thing>, move <thing>, attack/kill ' +
-  '<thing>, inventory, score, light lamp / turn off lamp.';
+  '<thing>, inventory, score, light lamp / turn off lamp, restart.';
 
 function resolveRoomText(room, flags, items, currentRoom) {
   const base = typeof room.text === 'function' ? room.text(flags) : room.text;
@@ -60,6 +60,39 @@ function resolveRoomText(room, flags, items, currentRoom) {
     .map((item) => item.floorText);
   return floorLines.length > 0 ? `${base}\n${floorLines.join('\n')}` : base;
 }
+
+// Pulled out to a named constant so `restart` (JIGS-UP's third-death
+// FINISH, or just typing RESTART) can reset back to it without
+// duplicating the literal.
+const INITIAL_FLAGS = {
+  mailboxOpen: false,
+  windowOpen: false,
+  rugMoved: false,
+  trapdoorOpen: false,
+  trapdoorBarred: false,
+  trollDefeated: false,
+  grateRevealed: false,
+  grateUnlocked: false,
+  grateOpen: false,
+  // Covers both CYCLOPS-FLAG and MAGIC-FLAG from the source - we only
+  // implement the "say ULYSSES" solution (not the lunch/water sleep
+  // path), and that one word sets both at once, so one flag suffices.
+  cyclopsFled: false,
+  treasureRoomVisited: false,
+  ewPassageVisited: false,
+  // Dam controls. gateFlag = the bubble's "greased and ready" state
+  // (yellow button primes it, brown button resets it) - turning the
+  // bolt only works while it's set. gatesOpen mirrors GATES-OPEN. The
+  // real LOW-TIDE reservoir-draining timer and the Loud Room's ECHO/
+  // platinum-bar puzzle aren't modeled - see PROJECT_STATUS.md.
+  gateFlag: false,
+  gatesOpen: false,
+  maintenanceLightsOn: false,
+  // The thief is a scoped-down "guardian" version of THIEF/I-THIEF: he
+  // always sits in the Treasure Room rather than roaming the whole map
+  // and stealing from other rooms (see PROJECT_STATUS.md).
+  thiefDefeated: false,
+};
 
 /**
  * Central game-state hook. Mirrors the phases of the original vanilla
@@ -76,35 +109,14 @@ export function useGameState() {
   // lampTurnsUsed only accumulates while the lamp is actually lit.
   const [lampTurnsUsed, setLampTurnsUsed] = useState(0);
   const [lampBurnedOut, setLampBurnedOut] = useState(false);
-  const [flags, setFlags] = useState({
-    mailboxOpen: false,
-    windowOpen: false,
-    rugMoved: false,
-    trapdoorOpen: false,
-    trapdoorBarred: false,
-    trollDefeated: false,
-    grateRevealed: false,
-    grateUnlocked: false,
-    grateOpen: false,
-    // Covers both CYCLOPS-FLAG and MAGIC-FLAG from the source - we only
-    // implement the "say ULYSSES" solution (not the lunch/water sleep
-    // path), and that one word sets both at once, so one flag suffices.
-    cyclopsFled: false,
-    treasureRoomVisited: false,
-    ewPassageVisited: false,
-    // Dam controls. gateFlag = the bubble's "greased and ready" state
-    // (yellow button primes it, brown button resets it) - turning the
-    // bolt only works while it's set. gatesOpen mirrors GATES-OPEN. The
-    // real LOW-TIDE reservoir-draining timer and the Loud Room's ECHO/
-    // platinum-bar puzzle aren't modeled - see PROJECT_STATUS.md.
-    gateFlag: false,
-    gatesOpen: false,
-    maintenanceLightsOn: false,
-    // The thief is a scoped-down "guardian" version of THIEF/I-THIEF: he
-    // always sits in the Treasure Room rather than roaming the whole map
-    // and stealing from other rooms (see PROJECT_STATUS.md).
-    thiefDefeated: false,
-  });
+  const [flags, setFlags] = useState(INITIAL_FLAGS);
+  // JIGS-UP: the grue-in-the-dark death. deaths counts toward the
+  // source's real third-death permanent ending (gameOver); the first two
+  // are a punishing-but-recoverable respawn. No save/restore yet (see
+  // PROJECT_STATUS.md), so `restart` just re-initializes all state
+  // in-memory rather than reloading a save file.
+  const [deaths, setDeaths] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
   // Combat is only relevant to the Troll Room/Treasure Room right now, so
   // this is simple top-level state rather than something threaded per-room.
   const [trollHealth, setTrollHealth] = useState(TROLL_STRENGTH);
@@ -160,6 +172,78 @@ export function useGameState() {
     }
   }, [hasLampLit, lampBurnedOut, lampTurnsUsed, log]);
 
+  /** Re-initializes every piece of state - no save/restore yet, so this is what `restart` does. */
+  const restartGame = useCallback(() => {
+    setCurrentRoom('westOfHouse');
+    setInventory([]);
+    setHasLampLit(false);
+    setLampTurnsUsed(0);
+    setLampBurnedOut(false);
+    setFlags(INITIAL_FLAGS);
+    setDeaths(0);
+    setGameOver(false);
+    setTrollHealth(TROLL_STRENGTH);
+    setTrollDisarmed(false);
+    setThiefHealth(THIEF_STRENGTH);
+    setThiefDisarmed(false);
+    setPlayerHealth(PLAYER_MAX_HEALTH);
+    setItems(INITIAL_ITEMS);
+    setBaseScore(0);
+    setMoves(0);
+    setTerminalLogs([]);
+  }, []);
+
+  /**
+   * JIGS-UP, scoped to its actual trigger in this game (see moveRoom's
+   * grue check): -10 score, the "You have died" banner, then either a
+   * punishing respawn (deaths 1-2) or the source's real permanent ending
+   * (death 3). RANDOMIZE-OBJECTS is simplified to two pools (treasures
+   * scatter to a random dark room, everything else to a random surface
+   * room) rather than the source's visited/unvisited room-history logic.
+   */
+  const handleDeath = useCallback(
+    (deathMessage) => {
+      log(deathMessage);
+      log('Bad luck, huh?');
+      log('****  You have died  ****');
+      setBaseScore((s) => s - 10);
+
+      const nextDeaths = deaths + 1;
+      setDeaths(nextDeaths);
+      if (nextDeaths >= 3) {
+        log(
+          "You clearly are a suicidal maniac. We don't allow psychotics in the cave, since they may harm other adventurers. Your remains will be installed in the Land of the Living Dead, where your fellow adventurers may gloat over them."
+        );
+        log('Type RESTART to begin again.');
+        setGameOver(true);
+        return;
+      }
+
+      log(
+        "Now, let's take a look here...\nWell, you probably deserve another chance. I can't quite fix you up completely, but you can't have everything."
+      );
+
+      const darkRoomIds = Object.values(ROOMS).filter((r) => r.dark).map((r) => r.id);
+      const surfaceRoomIds = Object.values(ROOMS)
+        .filter((r) => r.environment === 'surface')
+        .map((r) => r.id);
+      setItems((prev) => {
+        const next = { ...prev };
+        for (const id of inventory) {
+          const isTreasure = !!(next[id].value || next[id].tvalue);
+          const pool = isTreasure ? darkRoomIds : surfaceRoomIds;
+          next[id] = { ...next[id], location: pool[Math.floor(Math.random() * pool.length)] };
+        }
+        return next;
+      });
+      setInventory([]);
+      setHasLampLit(false);
+      setFlags((prev) => ({ ...prev, trapdoorBarred: false }));
+      setCurrentRoom('forest1');
+    },
+    [deaths, inventory, log]
+  );
+
   const isItemReachable = useCallback(
     (item) => {
       if (item.location === 'inventory') return true;
@@ -189,11 +273,22 @@ export function useGameState() {
 
   const moveRoom = useCallback(
     (direction) => {
+      if (gameOver) {
+        log('Type RESTART to begin again.');
+        return;
+      }
       incrementMoves();
       const targetId = room.exits[direction];
       if (!targetId) {
         const blockedEntry = room.blockedExits && room.blockedExits[direction];
         const blockedMessage = typeof blockedEntry === 'function' ? blockedEntry(flags) : blockedEntry;
+        // Only a genuinely undefined direction (no exit, no blocked-exit
+        // flavor text) risks the grue - matches V-WALK's fallthrough case
+        // in the source, not a blanket "acting in the dark is dangerous."
+        if (!blockedMessage && isDark && Math.random() < 0.8) {
+          handleDeath('Oh, no! You have walked into the slavering fangs of a lurking grue!');
+          return;
+        }
         log(blockedMessage || "You can't go that way.");
         return;
       }
@@ -245,7 +340,7 @@ export function useGameState() {
         log('It is pitch black. You are likely to be eaten by a grue.');
       }
     },
-    [room, flags, inventory, hasLampLit, log, incrementMoves]
+    [room, flags, inventory, hasLampLit, isDark, log, incrementMoves, handleDeath, gameOver]
   );
 
   const openObject = useCallback(
@@ -1047,6 +1142,10 @@ export function useGameState() {
   /** Generic dispatcher matching the requested hook shape. */
   const interactWithObject = useCallback(
     (objectName, action) => {
+      if (gameOver) {
+        log('Type RESTART to begin again.');
+        return;
+      }
       incrementMoves();
       switch (action) {
         case 'open': openObject(objectName); break;
@@ -1080,6 +1179,7 @@ export function useGameState() {
       pushButton,
       log,
       incrementMoves,
+      gameOver,
     ]
   );
 
@@ -1088,6 +1188,15 @@ export function useGameState() {
     (raw) => {
       const cmd = raw.trim().toLowerCase();
       if (!cmd) return;
+
+      if (cmd === 'restart') {
+        restartGame();
+        return;
+      }
+      if (gameOver) {
+        log('Type RESTART to begin again.');
+        return;
+      }
 
       if (DIRECTION_ALIASES[cmd]) {
         moveRoom(DIRECTION_ALIASES[cmd]);
@@ -1216,6 +1325,8 @@ export function useGameState() {
       currentRoom,
       flags.cyclopsFled,
       incrementMoves,
+      restartGame,
+      gameOver,
     ]
   );
 
@@ -1237,6 +1348,8 @@ export function useGameState() {
     trollHealth,
     trollDisarmed,
     playerHealth,
+    deaths,
+    gameOver,
     terminalLogs,
     moveRoom,
     interactWithObject,
