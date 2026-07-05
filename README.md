@@ -1,0 +1,33 @@
+# Zork 3D
+
+A 3D remake of Zork I, built as a Vite + React + React Three Fiber app.
+
+## Running it
+
+```
+npm install
+npm run dev
+```
+
+## Structure
+
+- `src/gameData/` — room and item dictionaries. Room text is sourced from
+  Zork I's original released ZIL source (`historicalsource/zork1` on
+  GitHub) rather than invented, so it matches the original game where a
+  room is implemented at all.
+- `src/state/useGameState.js` — the game engine: current room, inventory,
+  flags, a scrolling narrative log, and every verb (movement, open/close,
+  take/drop, examine, read, inventory, lamp toggle).
+- `src/components/` — `ViewportCanvas` (the R3F canvas + fixed isometric
+  camera), `SceneManager` (dispatches to a scene component per room),
+  `TextTerminal` (room text, log, direction buttons, command input), and
+  the individual room/primitive components.
+
+Each room is a self-contained "stage": the camera never moves, and
+switching rooms just mounts a different scene component - there's no
+manual scene-graph teardown to manage.
+
+## `legacy-vanilla/`
+
+The original prototype: a single-file vanilla Three.js implementation with
+no build step. Superseded by the React/R3F app above, kept for reference.
