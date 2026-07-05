@@ -44,6 +44,8 @@ Update this file when a decision or the room/item map changes meaningfully.
 | 32 | `JIGS-UP`'s treasure/inventory scatter on death (`RANDOMIZE-OBJECTS`) is simplified to two random pools (dark room for treasures, surface room for everything else) instead of the source's visited/unvisited room-history bookkeeping | This engine doesn't track room-visit history; a two-bucket random scatter produces the same *experience* (you lose your stuff and have to go find it again) without inventing a parallel visited-rooms subsystem just for this one mechanic |
 | 33 | The source's second death (the "ghost"/ Entrance-to-Hades sequence) is treated identically to the first - a normal punishing respawn, not the spectral/exorcism path | That path requires the Temple/Hades/Land-of-the-Living-Dead rooms, which aren't built yet - same "unbuilt prerequisite" situation as the maze and dam before their hub rooms existed. Only the source's real *third*-death permanent ending (`FINISH`, verbatim "suicidal maniac" text) is implemented as-is, since it doesn't depend on any additional rooms |
 | 34 | `restart` re-initializes all in-memory React state rather than reloading a save file | No save/restore system exists yet (backlog #12) - a bare "start over" was needed so the permanent third-death ending (and the source's own real `RESTART` verb) has *something* to do besides leave the player stuck typing into a dead terminal. `INITIAL_FLAGS` was pulled out to a named constant so this doesn't duplicate the flags-default literal |
+| 35 | `save`/`restore` use `localStorage` (one fixed slot) instead of the source's Z-machine file I/O | `SAVE`/`RESTORE` hand off to the interpreter's own disk operations in the original - there's no ZIL-level algorithm to port, just observable behavior ("Ok."/"Failed.", and `RESTORE` re-describing the current room via the same text `V-FIRST-LOOK` would use). `localStorage` is the natural browser equivalent of "a saved game position," and matches the original's one-save-slot floppy-disk-era UX rather than inventing multiple named slots |
+| 36 | `restart` mid-game asks a real yes/no confirmation (`pendingRestartConfirm`); `restart` while already `gameOver` skips it | Matches `V-RESTART`'s own "Do you wish to restart? (Y is affirmative):" prompt - there's real progress to lose mid-game, but nothing to protect once the game has already permanently ended (`FINISH`'s own prompt doesn't re-confirm either, it just offers RESTART/RESTORE/QUIT directly) |
 
 **Standing engineering practice throughout:** every UI/behavior change in this
 project has been verified by actually running the app (`npm run dev` +
@@ -146,7 +148,7 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 ### 2.5 Verbs / commands
 - Movement: `north/south/east/west/up/down` (+ `n/s/e/w/u/d`), `in`/`enter`, `out`/`leave`; WASD + arrow keys
 - Objects: `open`, `close`, `take`/`get`, `drop`, `put <thing> in/on <container>` (trophy case only), `move`/`raise` (rug and leaves only), `push <color> button` (Maintenance Room only), `turn bolt` (Dam Room only, requires the wrench), `examine`/`x`, `read`, `attack`/`kill`/`hit`/`fight` (the troll or the thief - defaults to whichever is in the current room if no target is named), `lock`/`unlock` (the grate only)
-- Meta: `look`, `inventory`/`i`/`inv`, `help`, `score`, `light lamp`/`turn on lamp`, `turn off lamp`/`extinguish lamp`/`douse lamp`, `ulysses`/`odysseus` (deliberately not listed in `help` - it's a discoverable secret in canon too), `restart` (re-initializes all state - see §1 decision 34)
+- Meta: `look`, `inventory`/`i`/`inv`, `help`, `score`, `light lamp`/`turn on lamp`, `turn off lamp`/`extinguish lamp`/`douse lamp`, `ulysses`/`odysseus` (deliberately not listed in `help` - it's a discoverable secret in canon too), `restart` (asks for Y/N confirmation mid-game - §1 decision 36), `save`/`restore` (one `localStorage` slot - §1 decision 35)
 - Click-to-interact on: mailbox, window, rug, trap door, lamp, sword, trophy case, troll, leaves, grate (both sides), skeleton key (hover shows an `<Html>` label; click fires the same handler as the equivalent typed verb). Depositing into the case, unlocking the grate, and the "ULYSSES" word are typed-only — the word puzzle has no object to click at all
 
 ### 2.6 Known simplifications (deliberate, not bugs)
@@ -167,6 +169,7 @@ legacy-vanilla/index.html — superseded single-file prototype, kept for referen
 - Lamp depletion (`lampTurnsUsed`/`lampBurnedOut` in `useGameState`) ticks off real player actions, not the source's interrupt-queue turns, so it can drift a turn or two from a from-scratch playthrough of the original if you compare move-for-move - see §1 decision 30. Once burned out, the lamp is permanently dead (matches `RMUNGBIT` - no replacement battery/lamp exists to fix it, matching the source, which also never gives you a spare)
 - Death only comes from the grue (blind move into an undefined direction) - none of the source's many other `JIGS-UP` triggers are wired up (falling into chasms, jumping off cliffs, opening the egg carelessly, etc.), since most are tied to verbs (`JUMP`, `BURN`) or rooms this game doesn't have yet. See §1 decisions 31-34 for what's simplified in the death flow itself (grue-trigger scope, the RANDOMIZE-OBJECTS scatter, the second-death ghost sequence, and `restart`)
 - The `diagnose` verb (backlog #11) still isn't built even though death now exists - it reports wound/health history the combat system doesn't currently track in that shape (troll/thief combat use a simple hit-point counter, not the source's named-injury model)
+- `save`/`restore` use one fixed browser `localStorage` slot, not the source's disk-file save-game system - saving again overwrites the previous save, and there's no "load a different file" concept. Save data lives in the browser (clearing site data wipes it) rather than being portable between machines
 
 ---
 
@@ -190,7 +193,7 @@ room text or mechanics from memory.
 ### Requires a new subsystem
 10. ~~**Thief NPC**~~ — done, scoped down. He's a stationary guardian in the Treasure Room (real combat, `STRENGTH 5`, blocks the chalice until defeated) rather than the source's map-wide per-turn roaming/stealing demon - see §1 decision 28 and §2.6 for exactly what's deferred. A future pass could still add the cyclops's alternate lunch/water sleep solution (§2.6) alongside the LUNCH/WATER/BOTTLE items it needs, independent of the thief now
 11. **`diagnose` verb** — death/health stats now that death exists (#14), but the combat system's simple hit-point counters don't carry the source's named-injury history this verb reports on
-12. **Save/restore** — no real persistence at all currently; page refresh loses all state (`restart`, added alongside the death mechanic, only resets to a fresh game - see §1 decision 34)
+12. ~~**Save/restore**~~ — done, via one `localStorage` slot standing in for the source's disk-file save (see §1 decision 35). `save`/`restore` round-trip every piece of game state, verified live across an actual page reload, not just in-memory. `restart` (added alongside the death mechanic) now asks for Y/N confirmation mid-game, matching the real `V-RESTART` (§1 decision 36)
 13. ~~**Light source depletion**~~ — done. The lamp's real `LAMP-TABLE` thresholds (100/170/185 turns lit, verbatim dimming text) are wired into `incrementMoves`; it burns out for good at 186 turns of cumulative lit-time, refuses to relight, and `examine lamp` reflects on/off/burned-out state. See §1 decision 30 and §2.6 for what's simplified (a plain counter instead of the source's interrupt-queue demon)
 14. ~~**Death mechanic**~~ — done, scoped to its real trigger. The grue only attacks on a blind move into a truly undefined direction (matches `V-WALK`'s actual `COND` branches, not "any action in the dark" - see §1 decision 31), with the source's real -10 penalty, "You have died" banner, and a two-out-of-three-strikes structure: the first two deaths scatter your inventory and respawn you at Forest 1 (§1 decision 32), the third is the source's actual permanent ending (verbatim "suicidal maniac" text), gated everywhere (`moveRoom`/`interactWithObject`/`runCommand`) until you type `restart`. The source's spectral second-death/Hades sequence isn't modeled (§1 decision 33) since it needs unbuilt Temple/Hades rooms
 15. **Rainbow/sceptre puzzle** — the sceptre (from the Egyptian Room, deep in the dungeon) waved on the rainbow makes it solid, opening On the Rainbow, Aragain Falls, and the pot-of-gold treasure. Blocked on reaching the sceptre's location first, so naturally sequenced after more of the underground is built
@@ -286,6 +289,12 @@ grue risk lives in (only the true "no exit at all" fallthrough, after
 every `UEXIT`/`NEXIT`/`FEXIT`/`CEXIT` case has already failed to
 match), rather than assuming "acting in the dark is dangerous" applies
 everywhere. `V-RESTART` (`gverbs.zil`) for the real `restart` verb.
+Save/restore: `ROUTINE V-SAVE`, `ROUTINE V-RESTORE`, `ROUTINE FINISH`
+(`gverbs.zil`) - confirmed the actual verb behavior is just "Ok."/
+"Failed." plus `RESTORE` re-describing the room via `V-FIRST-LOOK`;
+the underlying `SAVE`/`RESTORE` Z-machine opcodes are interpreter-level
+file I/O with no ZIL-visible algorithm to port, so only the observable
+text/behavior carried over (see §1 decision 35).
 
 ---
 

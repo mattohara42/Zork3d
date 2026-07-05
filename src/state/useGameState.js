@@ -51,7 +51,7 @@ const HELP_TEXT =
   'Commands: north/south/east/west/up/down/in/out (or n/s/e/w/u/d), look, ' +
   'examine <thing>, open/close <thing>, lock/unlock <thing>, take/drop ' +
   '<thing>, put <thing> in case, read <thing>, move <thing>, attack/kill ' +
-  '<thing>, inventory, score, light lamp / turn off lamp, restart.';
+  '<thing>, inventory, score, light lamp / turn off lamp, save, restore, restart.';
 
 function resolveRoomText(room, flags, items, currentRoom) {
   const base = typeof room.text === 'function' ? room.text(flags) : room.text;
@@ -112,11 +112,13 @@ export function useGameState() {
   const [flags, setFlags] = useState(INITIAL_FLAGS);
   // JIGS-UP: the grue-in-the-dark death. deaths counts toward the
   // source's real third-death permanent ending (gameOver); the first two
-  // are a punishing-but-recoverable respawn. No save/restore yet (see
-  // PROJECT_STATUS.md), so `restart` just re-initializes all state
-  // in-memory rather than reloading a save file.
+  // are a punishing-but-recoverable respawn.
   const [deaths, setDeaths] = useState(0);
   const [gameOver, setGameOver] = useState(false);
+  // V-RESTART asks "Do you wish to restart? (Y is affirmative):" before
+  // wiping progress - this tracks that we're waiting on the next typed
+  // command to be the yes/no answer, same targeted pattern as YES?.
+  const [pendingRestartConfirm, setPendingRestartConfirm] = useState(false);
   // Combat is only relevant to the Troll Room/Treasure Room right now, so
   // this is simple top-level state rather than something threaded per-room.
   const [trollHealth, setTrollHealth] = useState(TROLL_STRENGTH);
@@ -194,6 +196,99 @@ export function useGameState() {
   }, []);
 
   /**
+   * SAVE/RESTORE: the source hands this off to the Z-machine interpreter's
+   * own file I/O, which has no real equivalent here - localStorage is the
+   * natural browser stand-in for "a saved game position." One fixed slot
+   * (matches the original's one-save-at-a-time floppy-disk-era UX), and
+   * unlike `restart`, the terminal scrollback isn't cleared - RESTORE just
+   * appends "Ok." and a fresh room description on top, same as it would
+   * on a real terminal that never wiped its own transcript.
+   */
+  const saveGame = useCallback(() => {
+    try {
+      const snapshot = {
+        version: 1,
+        currentRoom,
+        inventory,
+        hasLampLit,
+        lampTurnsUsed,
+        lampBurnedOut,
+        flags,
+        deaths,
+        gameOver,
+        trollHealth,
+        trollDisarmed,
+        thiefHealth,
+        thiefDisarmed,
+        playerHealth,
+        items,
+        baseScore,
+        moves,
+      };
+      window.localStorage.setItem('zork3d-save', JSON.stringify(snapshot));
+      log('Ok.');
+    } catch {
+      log('Failed.');
+    }
+  }, [
+    currentRoom,
+    inventory,
+    hasLampLit,
+    lampTurnsUsed,
+    lampBurnedOut,
+    flags,
+    deaths,
+    gameOver,
+    trollHealth,
+    trollDisarmed,
+    thiefHealth,
+    thiefDisarmed,
+    playerHealth,
+    items,
+    baseScore,
+    moves,
+    log,
+  ]);
+
+  const restoreGame = useCallback(() => {
+    try {
+      const raw = window.localStorage.getItem('zork3d-save');
+      const snap = raw && JSON.parse(raw);
+      if (!snap || snap.version !== 1 || !ROOMS[snap.currentRoom]) {
+        log('Failed.');
+        return;
+      }
+      setCurrentRoom(snap.currentRoom);
+      setInventory(snap.inventory);
+      setHasLampLit(snap.hasLampLit);
+      setLampTurnsUsed(snap.lampTurnsUsed);
+      setLampBurnedOut(snap.lampBurnedOut);
+      setFlags(snap.flags);
+      setDeaths(snap.deaths);
+      setGameOver(snap.gameOver);
+      setTrollHealth(snap.trollHealth);
+      setTrollDisarmed(snap.trollDisarmed);
+      setThiefHealth(snap.thiefHealth);
+      setThiefDisarmed(snap.thiefDisarmed);
+      setPlayerHealth(snap.playerHealth);
+      setItems(snap.items);
+      setBaseScore(snap.baseScore);
+      setMoves(snap.moves);
+
+      log('Ok.');
+      const restoredRoom = ROOMS[snap.currentRoom];
+      const restoredIsDark = !!restoredRoom.dark && !snap.hasLampLit;
+      log(
+        restoredIsDark
+          ? 'It is pitch black. You are likely to be eaten by a grue.'
+          : resolveRoomText(restoredRoom, snap.flags, snap.items, snap.currentRoom)
+      );
+    } catch {
+      log('Failed.');
+    }
+  }, [log]);
+
+  /**
    * JIGS-UP, scoped to its actual trigger in this game (see moveRoom's
    * grue check): -10 score, the "You have died" banner, then either a
    * punishing respawn (deaths 1-2) or the source's real permanent ending
@@ -214,7 +309,7 @@ export function useGameState() {
         log(
           "You clearly are a suicidal maniac. We don't allow psychotics in the cave, since they may harm other adventurers. Your remains will be installed in the Land of the Living Dead, where your fellow adventurers may gloat over them."
         );
-        log('Type RESTART to begin again.');
+        log('Type RESTART or RESTORE to continue.');
         setGameOver(true);
         return;
       }
@@ -274,7 +369,7 @@ export function useGameState() {
   const moveRoom = useCallback(
     (direction) => {
       if (gameOver) {
-        log('Type RESTART to begin again.');
+        log('Type RESTART or RESTORE to continue.');
         return;
       }
       incrementMoves();
@@ -1143,7 +1238,7 @@ export function useGameState() {
   const interactWithObject = useCallback(
     (objectName, action) => {
       if (gameOver) {
-        log('Type RESTART to begin again.');
+        log('Type RESTART or RESTORE to continue.');
         return;
       }
       incrementMoves();
@@ -1189,12 +1284,35 @@ export function useGameState() {
       const cmd = raw.trim().toLowerCase();
       if (!cmd) return;
 
+      if (pendingRestartConfirm) {
+        setPendingRestartConfirm(false);
+        if (cmd === 'y' || cmd === 'yes') {
+          log('Restarting.');
+          restartGame();
+        } else {
+          log('Ok.');
+        }
+        return;
+      }
       if (cmd === 'restart') {
-        restartGame();
+        if (gameOver) {
+          restartGame();
+        } else {
+          setPendingRestartConfirm(true);
+          log('Do you wish to restart? (Y is affirmative): ');
+        }
+        return;
+      }
+      if (cmd === 'restore') {
+        restoreGame();
         return;
       }
       if (gameOver) {
-        log('Type RESTART to begin again.');
+        log('Type RESTART or RESTORE to continue.');
+        return;
+      }
+      if (cmd === 'save') {
+        saveGame();
         return;
       }
 
@@ -1327,6 +1445,9 @@ export function useGameState() {
       incrementMoves,
       restartGame,
       gameOver,
+      pendingRestartConfirm,
+      saveGame,
+      restoreGame,
     ]
   );
 
