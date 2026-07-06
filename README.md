@@ -29,11 +29,6 @@ Each room is a self-contained "stage": the camera never moves, and
 switching rooms just mounts a different scene component - there's no
 manual scene-graph teardown to manage.
 
-## `legacy-vanilla/`
-
-The original prototype: a single-file vanilla Three.js implementation with
-no build step. Superseded by the React/R3F app above, kept for reference.
-
 ## Project status, decisions, and backlog
 
 See [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) for the full architectural

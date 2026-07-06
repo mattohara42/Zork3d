@@ -14,7 +14,7 @@ Update this file when a decision or the room/item map changes meaningfully.
 | 2 | "Theater stage" transition model: camera never animates between rooms; each room's geometry is torn down and rebuilt fresh around a fixed camera | Avoids hand-rolled `requestAnimationFrame` easing loops; matches the discrete, room-to-room nature of text-adventure movement |
 | 3 | Accuracy-first content policy | User directive: "no deviations or new content" — room text, verb responses, and mechanics must match the original where implemented, rather than being invented "in the spirit of" Zork |
 | 4 | Canonical source of truth: **Infocom's released ZIL source**, not memory | `historicalsource/zork1` on GitHub (see §4). Caught and corrected real mistakes this way — see §6 |
-| 5 | **Migrated the whole engine to Vite + React + React Three Fiber**, superseding the vanilla build | Explicit user request ("Migrate"). `legacy-vanilla/` kept only for reference, not maintained |
+| 5 | **Migrated the whole engine to Vite + React + React Three Fiber**, superseding the vanilla build | Explicit user request ("Migrate"). `legacy-vanilla/` kept only for reference, not maintained (deleted later - see backlog #19) |
 | 6 | Fixed **first-person** perspective camera at the world origin (not orbiting, not isometric) | Camera briefly used an orthographic isometric rig per an early spec, then explicitly changed to first-person. The camera still never moves — same "theater stage" principle carries over: rooms build their geometry around the fixed viewpoint via a shared `GROUND_Y`/`EYE_HEIGHT` convention (`primitives/Ground.jsx`) |
 | 7 | State lives in one hook, `useGameState`, not scattered component state | Central place for room/inventory/flags/verbs; components are thin renderers of that state |
 | 8 | Room `text` can be a plain string **or** a function of `flags` | Needed for rooms whose description genuinely varies (Living Room's rug/trap-door state), mirroring how the original's `LIVING-ROOM-FCN` composes text dynamically rather than storing one fixed string |
@@ -89,7 +89,6 @@ src/
     rooms/              — one component per room (RoomRegistry.jsx maps id -> component)
     primitives/         — shared pieces: Ground, HouseShell, Mailbox, WindowPane, Tree,
                            ObjectLabel (drei Html labels), LanternLight (lantern spotlight)
-legacy-vanilla/index.html — superseded single-file prototype, kept for reference only
 ```
 
 ### 2.3 Rooms implemented (74)
@@ -235,8 +234,8 @@ room text or mechanics from memory.
 
 ### Housekeeping / non-gameplay
 17. No automated test suite — all verification so far has been manual (Playwright driven live-browser checks per change, not committed as regression tests)
-18. Bundle size warning on build (`>500kB` single chunk) — candidate for route-level or R3F-scene code-splitting if it matters for load time
-19. `legacy-vanilla/` is inert reference-only; consider deleting once nobody needs to diff against it
+18. ~~Bundle size warning~~ — addressed, not "fixed" by shrinking the download. `three`/`@react-three/fiber`/`@react-three/drei` are the entire bulk of the bundle and always load together (there's no lazy-load boundary - the 3D canvas is needed immediately), so `vite.config.js` now splits them into their own `vendor` chunk via `manualChunks` and raises `chunkSizeWarningLimit` to 1200. Real benefit: app code (now ~117kB) is isolated from the ~1MB vendor chunk, so deploys that only touch game code don't invalidate visitors' cached vendor bundle. Verified against an actual production build (`vite build` + `vite preview`), not just the dev server, since chunking only applies there
+19. ~~`legacy-vanilla/`~~ — deleted. It was the original 2-room single-file prototype, fully superseded since the Vite/React migration (decision #5); nobody had needed to diff against it in a very long time
 
 ---
 
