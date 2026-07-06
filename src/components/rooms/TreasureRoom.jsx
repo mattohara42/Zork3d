@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Ground, { GROUND_Y } from '../primitives/Ground';
 import ObjectLabel from '../primitives/ObjectLabel';
+import { DungeonWall } from '../3d/VisualKit';
 
 const WALL_COLOR = '#6b5a42';
 const WALL_HEIGHT = 3.2;
@@ -125,10 +126,13 @@ export default function TreasureRoom({ flags, items, onInteract }) {
   return (
     <group>
       <Ground color="#5c4e38" size={8} />
-      <mesh position={[0, GROUND_Y + WALL_HEIGHT / 2, -4]}>
-        <boxGeometry args={[8, WALL_HEIGHT, 0.2]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
+      <DungeonWall
+        position={[0, GROUND_Y + WALL_HEIGHT / 2, -4]}
+        rotation={[0, Math.PI / 2, 0]}
+        depth={8}
+        height={WALL_HEIGHT}
+        color={WALL_COLOR}
+      />
       <Bag position={[-2.5, GROUND_Y + 0.2, -3]} />
       <Bag position={[2, GROUND_Y + 0.2, -3.3]} />
       {!flags.thiefDefeated && <Thief onInteract={onInteract} />}

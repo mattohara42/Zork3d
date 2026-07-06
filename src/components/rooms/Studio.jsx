@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import Ground, { GROUND_Y } from '../primitives/Ground';
 import ObjectLabel from '../primitives/ObjectLabel';
+import { DungeonWall } from '../3d/VisualKit';
 
+const WALL_COLOR = '#8a8070';
 const WALL_HEIGHT = 3;
 const WALL_CENTER_Y = GROUND_Y + WALL_HEIGHT / 2;
 
@@ -70,18 +72,19 @@ export default function Studio({ items, onInteract }) {
     <group>
       <Ground color="#726858" size={8} />
 
-      <mesh position={[0, WALL_CENTER_Y, -4.5]}>
-        <boxGeometry args={[8, WALL_HEIGHT, 0.2]} />
-        <meshStandardMaterial color="#8a8070" />
-      </mesh>
-      <mesh position={[-4, WALL_CENTER_Y, 0]}>
-        <boxGeometry args={[0.2, WALL_HEIGHT, 8]} />
-        <meshStandardMaterial color="#8a8070" />
-      </mesh>
-      <mesh position={[4, WALL_CENTER_Y, 0]}>
-        <boxGeometry args={[0.2, WALL_HEIGHT, 8]} />
-        <meshStandardMaterial color="#8a8070" />
-      </mesh>
+      {/* protrude={false}: the paint splatters below sit flush against
+          this wall at z=-4.4, same clipping concern as Gallery's
+          painting (see VisualKit.jsx). */}
+      <DungeonWall
+        position={[0, WALL_CENTER_Y, -4.5]}
+        rotation={[0, Math.PI / 2, 0]}
+        depth={8}
+        height={WALL_HEIGHT}
+        color={WALL_COLOR}
+        protrude={false}
+      />
+      <DungeonWall position={[-4, WALL_CENTER_Y, 0]} height={WALL_HEIGHT} depth={8} color={WALL_COLOR} />
+      <DungeonWall position={[4, WALL_CENTER_Y, 0]} height={WALL_HEIGHT} depth={8} color={WALL_COLOR} />
 
       {SPLATTERS.map((s, i) => (
         <mesh key={i} position={s.pos}>

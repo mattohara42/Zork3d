@@ -41,10 +41,15 @@ const STONE_BLOCKS = [
  * center, matching how every room already positions a plain wall
  * `<mesh>` today - this is meant as a drop-in replacement for one.
  *
- * The stone blocks are sized slightly *wider* than the wall itself
- * (along the wall's thickness axis) and centered on the same axis, so
- * they protrude evenly from whichever face ends up facing the camera -
- * this component doesn't need to know which side of the wall that is.
+ * By default the stone blocks are sized slightly *wider* than the wall
+ * itself (along the wall's thickness axis) and centered on the same
+ * axis, so they protrude evenly from whichever face ends up facing the
+ * camera - this component doesn't need to know which side of the wall
+ * that is. Pass `protrude={false}` for a wall that has something else
+ * mounted flush against its face (a painting, a fixed prop) where a
+ * protruding block would visibly clip through it - the blocks then sit
+ * *narrower* than the wall instead, fully recessed within its thickness,
+ * trading the 3D bump for a flatter, color-only relief.
  */
 export function DungeonWall({
   position = [0, 0, 0],
@@ -53,8 +58,10 @@ export function DungeonWall({
   height = 3,
   depth = 9,
   color = '#4a453f',
+  protrude = true,
 }) {
   const blockColor = useMemo(() => shade(color, 0.65), [color]);
+  const blockWidth = width * (protrude ? 1.5 : 0.7);
 
   return (
     <group position={position} rotation={rotation}>
@@ -64,7 +71,7 @@ export function DungeonWall({
       </mesh>
       {STONE_BLOCKS.map((b, i) => (
         <mesh key={i} castShadow position={[0, height * b.yFrac, depth * b.zFrac]} rotation={[0, 0, b.tilt]}>
-          <boxGeometry args={[width * 1.5, height * b.hFrac, depth * b.dFrac]} />
+          <boxGeometry args={[blockWidth, height * b.hFrac, depth * b.dFrac]} />
           <KitMaterial color={blockColor} />
         </mesh>
       ))}

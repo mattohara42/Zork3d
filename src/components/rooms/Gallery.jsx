@@ -47,13 +47,18 @@ export default function Gallery({ items, onInteract }) {
     <group>
       <Ground color="#a89f8c" size={9} />
 
-      {/* Back wall stays plain, not DungeonWall - its stone blocks would
-          protrude enough to clip through the painting sitting flush
-          against it at z=-4.4. */}
-      <mesh position={[0, WALL_CENTER_Y, -4.5]}>
-        <boxGeometry args={[9, WALL_HEIGHT, 0.2]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
+      {/* protrude={false} keeps the stone blocks recessed within the
+          wall's own thickness instead of poking past its face - the
+          painting sits flush against this wall at z=-4.4, close enough
+          that the default protruding blocks would clip through it. */}
+      <DungeonWall
+        position={[0, WALL_CENTER_Y, -4.5]}
+        rotation={[0, Math.PI / 2, 0]}
+        depth={9}
+        height={WALL_HEIGHT}
+        color={WALL_COLOR}
+        protrude={false}
+      />
       <DungeonWall position={[-4.5, WALL_CENTER_Y, 0]} height={WALL_HEIGHT} color={WALL_COLOR} />
       <DungeonWall position={[4.5, WALL_CENTER_Y, 0]} height={WALL_HEIGHT} color={WALL_COLOR} />
 
