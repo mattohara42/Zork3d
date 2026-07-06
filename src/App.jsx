@@ -46,6 +46,7 @@ export default function App() {
         environment={room.environment}
         naturallyLit={!room.dark}
         lanternLit={hasLampLit}
+        cameraOffset={room.cameraOffset}
         onInteract={interactWithObject}
       />
       <TextTerminal

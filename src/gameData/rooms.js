@@ -167,6 +167,9 @@ export const ROOMS = {
         ? ''
         : '\nA nasty-looking troll, brandishing a bloody axe, blocks all passages out of the room.'),
     dark: true,
+    // A small forward dolly (see CameraController) - stepping in on the
+    // troll a little rather than snapping to a static view of him.
+    cameraOffset: [0, 0, -0.4],
     // East (EW-Passage) and west (the Maze) both really open once the
     // troll is dealt with in canon, gated the same way the Cellar's
     // `up`/Living Room's `down` already are.
@@ -748,6 +751,10 @@ export const ROOMS = {
     exits: { down: 'cyclopsRoom' },
     onEnter: (flags) =>
       flags.treasureRoomVisited ? null : { flagUpdates: { treasureRoomVisited: true }, scoreBonus: 25 },
+    // A slight rise and step forward (see CameraController) - the one
+    // real payoff room in the dungeon gets a touch more presence than a
+    // flat cut in.
+    cameraOffset: [0, 0.06, -0.35],
   },
 
   // The central hub connecting the Troll Room to the rest of the
@@ -1109,6 +1116,8 @@ export const ROOMS = {
     text: 'This is a room which looks like an Egyptian tomb. There is an ascending staircase to the west.',
     dark: true,
     exits: { west: 'northTemple' },
+    // A small forward dolly toward the coffin (see CameraController).
+    cameraOffset: [0, 0, -0.3],
   },
 
   // ONBIT + SACREDBIT - lit. `down` needs COFFIN-CURE (not carrying the
@@ -1124,6 +1133,8 @@ export const ROOMS = {
       'floor which leads into darkness. You probably could not get back ' +
       'up it.',
     exits: { north: 'northTemple', down: 'tinyCave' },
+    // A slight rise and step forward toward the altar (see CameraController).
+    cameraOffset: [0, 0.05, -0.3],
     exitGuards: {
       down: (flags, inventory) =>
         inventory.includes('coffin') ? "You haven't a prayer of getting the coffin down there." : null,

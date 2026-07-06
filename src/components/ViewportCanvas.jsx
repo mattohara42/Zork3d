@@ -4,6 +4,9 @@ import { Color } from 'three';
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import SceneManager from './SceneManager';
 import EnvironmentLighting from './primitives/EnvironmentLighting';
+import CameraController from './CameraController';
+
+const ZERO_OFFSET = [0, 0, 0];
 
 const SKY_COLOR = '#87ceeb';
 const DARK_COLOR = '#000000';
@@ -11,12 +14,15 @@ const FOG_COLOR = '#050505';
 const CAMERA_FOV = 60;
 
 /**
- * Every room is its own stage: the camera never travels through a shared
- * world, it just sits fixed at the origin looking straight ahead, and each
- * room's scene component builds its geometry relative to that fixed
- * first-person viewpoint (see GROUND_Y in primitives/Ground.jsx). This
- * runs once on mount to lock that in - Canvas's `camera` prop sets
- * position/fov but never calls lookAt() for you.
+ * Sets the camera's starting position/rotation once, at mount - every
+ * room still builds its geometry around the origin (see GROUND_Y in
+ * primitives/Ground.jsx), so this is what the vast majority of rooms
+ * (no `cameraOffset`) actually rest at. Only *rotation* stays fixed for
+ * the whole session, though: CameraController (rendered alongside this)
+ * takes over *position* on every subsequent frame, easing it toward
+ * whatever offset the current room requests - "always facing -Z" is
+ * true regardless of where the camera sits along that heading, so a
+ * moving position never needs a re-aimed lookAt to keep reading right.
  */
 function FixedCameraRig() {
   const { camera } = useThree();
@@ -54,6 +60,7 @@ export default function ViewportCanvas({
   environment,
   naturallyLit,
   lanternLit,
+  cameraOffset = ZERO_OFFSET,
   onInteract,
 }) {
   // isDark/isUnderground alone miss one real case: a naturally-lit
@@ -69,6 +76,7 @@ export default function ViewportCanvas({
     <div style={{ flex: '0 0 65%', width: '100%', background: backgroundColor }}>
       <Canvas shadows camera={{ position: [0, 0, 0], fov: CAMERA_FOV, near: 0.1, far: 1000 }}>
         <FixedCameraRig />
+        <CameraController targetOffset={cameraOffset} />
         <SceneBackground color={backgroundColor} />
         <EnvironmentLighting
           environment={environment}
