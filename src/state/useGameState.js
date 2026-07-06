@@ -30,6 +30,7 @@ import {
   LAMP_NEARLY_OUT_TEXT,
   LAMP_BURNOUT_TEXT,
 } from '../gameData/lamp';
+import { isMazeRoom } from '../gameData/mapLayout';
 
 const randomPick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -53,7 +54,31 @@ const HELP_TEXT =
   '<thing>, put <thing> in case, give <thing> to <someone>, tie <thing> ' +
   'to <thing>, untie <thing>, wave <thing>, rub <thing>, pray, read ' +
   '<thing>, move <thing>, attack/kill <thing>, inventory, score, ' +
-  'diagnose, light lamp / turn off lamp, save, restore, restart.';
+  'diagnose, hint, light lamp / turn off lamp, save, restore, restart.';
+
+// New meta/UX feature, not sourced from the ZIL source - the accuracy-
+// first content policy governs simulated game-world text, not tooling
+// layered on top of it (see PROJECT_STATUS.md §2.8). Graduated,
+// InvisiClues-book style: vaguer on the first ask, sharper on repeat
+// asks, matching how Infocom's own printed hint books worked. Tier 3's
+// directions are a real, verified path through this game's own maze
+// graph (computed once via BFS over gameData/rooms.js, not guessed or
+// recalled from a walkthrough), from the Troll Room's `west` entrance.
+const MAZE_HINTS = [
+  'Twisty little passages that all look alike are a classic puzzle - ' +
+    'wandering blindly will loop you right back on yourself. Adventurers ' +
+    'have long solved this by leaving something recognizable behind in ' +
+    'each room, then checking whether it turns up again when they return.',
+  "There's a skeleton (and a key worth having) in one of these rooms, " +
+    'and a locked grate elsewhere that only opens from the inside once ' +
+    "you've got that key. Finding both would shorten your trip - and " +
+    'give you a second way out besides the one you came in.',
+  'From the Troll Room: west into the maze, then south, east, up reaches ' +
+    'the skeleton and its key. From there, west, up, down, east reaches ' +
+    'the Grating Room - unlock and open the grate, then up leads outside. ' +
+    'Or, from the maze entrance: south, east, up, west, east, south, ' +
+    'east reaches the Cyclops Room instead.',
+];
 
 function resolveRoomText(room, flags, items, currentRoom) {
   const base = typeof room.text === 'function' ? room.text(flags) : room.text;
@@ -157,6 +182,10 @@ export function useGameState() {
   // rather than incrementing/decrementing by hand).
   const [baseScore, setBaseScore] = useState(0);
   const [moves, setMoves] = useState(0);
+  // How many times `hint` has been asked while inside the Maze - caps at
+  // MAZE_HINTS.length so repeat asks past that just re-show the last,
+  // most specific tier rather than erroring.
+  const [mazeHintLevel, setMazeHintLevel] = useState(0);
 
   useEffect(() => {
     setVisitedRooms((prev) => (prev.includes(currentRoom) ? prev : [...prev, currentRoom]));
@@ -216,6 +245,7 @@ export function useGameState() {
     setItems(INITIAL_ITEMS);
     setBaseScore(0);
     setMoves(0);
+    setMazeHintLevel(0);
     setTerminalLogs([]);
   }, []);
 
@@ -249,6 +279,7 @@ export function useGameState() {
         items,
         baseScore,
         moves,
+        mazeHintLevel,
       };
       window.localStorage.setItem('zork3d-save', JSON.stringify(snapshot));
       log('Ok.');
@@ -273,6 +304,7 @@ export function useGameState() {
     items,
     baseScore,
     moves,
+    mazeHintLevel,
     log,
   ]);
 
@@ -303,6 +335,8 @@ export function useGameState() {
       setItems(snap.items);
       setBaseScore(snap.baseScore);
       setMoves(snap.moves);
+      // Older saves predate the hint system - just start back at 0.
+      setMazeHintLevel(snap.mazeHintLevel || 0);
 
       log('Ok.');
       const restoredRoom = ROOMS[snap.currentRoom];
@@ -1505,6 +1539,23 @@ export function useGameState() {
     }
   }, [playerHealth, deaths, log]);
 
+  /**
+   * `hint`, scoped to the Maze - see MAZE_HINTS above for why this
+   * exists at all despite the accuracy-first content policy (it's a new
+   * meta feature, not simulated game content). Only does anything while
+   * actually standing in one of the maze-blob rooms, so it can't be used
+   * to fish for "is the maze near here" before you've found it yourself.
+   */
+  const hintVerb = useCallback(() => {
+    if (!isMazeRoom(currentRoom)) {
+      log("There's nothing to hint about here.");
+      return;
+    }
+    const level = Math.min(mazeHintLevel, MAZE_HINTS.length - 1);
+    log(MAZE_HINTS[level]);
+    setMazeHintLevel((prev) => Math.min(prev + 1, MAZE_HINTS.length));
+  }, [currentRoom, mazeHintLevel, log]);
+
   const setLampLit = useCallback(
     (lit) => {
       // Deliberately stricter than "reachable" (room-or-inventory): our
@@ -1635,6 +1686,10 @@ export function useGameState() {
         diagnoseVerb();
         return;
       }
+      if (cmd === 'hint') {
+        hintVerb();
+        return;
+      }
       if (cmd === 'ulysses' || cmd === 'odysseus') {
         incrementMoves();
         sayUlysses();
@@ -1759,6 +1814,7 @@ export function useGameState() {
       showInventory,
       showScore,
       diagnoseVerb,
+      hintVerb,
       setLampLit,
       log,
       openObject,
