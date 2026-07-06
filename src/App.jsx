@@ -1,11 +1,14 @@
+import { useState } from 'react';
 import { useGameState } from './state/useGameState';
 import { useKeyboardMovement } from './state/useKeyboardMovement';
 import ViewportCanvas from './components/ViewportCanvas';
 import TextTerminal from './components/TextTerminal';
+import MapPanel from './components/MapPanel';
 
 export default function App() {
   const {
     currentRoom,
+    visitedRooms,
     room,
     roomText,
     exits,
@@ -21,6 +24,8 @@ export default function App() {
   } = useGameState();
 
   useKeyboardMovement(moveRoom);
+
+  const [showMap, setShowMap] = useState(false);
 
   return (
     <div
@@ -51,7 +56,16 @@ export default function App() {
         terminalLogs={terminalLogs}
         onMove={moveRoom}
         onCommand={runCommand}
+        onToggleMap={() => setShowMap((v) => !v)}
       />
+      {showMap && (
+        <MapPanel
+          visitedRooms={visitedRooms}
+          currentRoom={currentRoom}
+          flags={flags}
+          onClose={() => setShowMap(false)}
+        />
+      )}
     </div>
   );
 }

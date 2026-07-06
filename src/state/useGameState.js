@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ROOMS } from '../gameData/rooms';
 import { INITIAL_ITEMS } from '../gameData/items';
 import {
@@ -115,6 +115,13 @@ const INITIAL_FLAGS = {
  */
 export function useGameState() {
   const [currentRoom, setCurrentRoom] = useState('westOfHouse');
+  // Every room ever entered, for the map (MapPanel) to render as
+  // "discovered" - not part of the original engine, a UI-only addition
+  // (see PROJECT_STATUS.md §2.8). Tracked reactively off currentRoom
+  // itself rather than threaded through every setCurrentRoom call site
+  // (moveRoom, handleDeath's respawn, prayVerb/rubMirror's teleports,
+  // restoreGame) - one effect below covers all of them for free.
+  const [visitedRooms, setVisitedRooms] = useState(['westOfHouse']);
   const [inventory, setInventory] = useState([]);
   const [hasLampLit, setHasLampLit] = useState(false);
   // The battery lamp's life is finite (LAMP-TABLE) - see gameData/lamp.js.
@@ -150,6 +157,10 @@ export function useGameState() {
   // rather than incrementing/decrementing by hand).
   const [baseScore, setBaseScore] = useState(0);
   const [moves, setMoves] = useState(0);
+
+  useEffect(() => {
+    setVisitedRooms((prev) => (prev.includes(currentRoom) ? prev : [...prev, currentRoom]));
+  }, [currentRoom]);
 
   const room = ROOMS[currentRoom];
   // isDark: a dark room with no light source - pitch black, can't see.
@@ -189,6 +200,7 @@ export function useGameState() {
   /** Re-initializes every piece of state - no save/restore yet, so this is what `restart` does. */
   const restartGame = useCallback(() => {
     setCurrentRoom('westOfHouse');
+    setVisitedRooms(['westOfHouse']);
     setInventory([]);
     setHasLampLit(false);
     setLampTurnsUsed(0);
@@ -221,6 +233,7 @@ export function useGameState() {
       const snapshot = {
         version: 1,
         currentRoom,
+        visitedRooms,
         inventory,
         hasLampLit,
         lampTurnsUsed,
@@ -244,6 +257,7 @@ export function useGameState() {
     }
   }, [
     currentRoom,
+    visitedRooms,
     inventory,
     hasLampLit,
     lampTurnsUsed,
@@ -271,6 +285,9 @@ export function useGameState() {
         return;
       }
       setCurrentRoom(snap.currentRoom);
+      // Older saves predate visitedRooms - fall back to just the restored
+      // room rather than leaving the map's discovery state undefined.
+      setVisitedRooms(snap.visitedRooms || [snap.currentRoom]);
       setInventory(snap.inventory);
       setHasLampLit(snap.hasLampLit);
       setLampTurnsUsed(snap.lampTurnsUsed);
@@ -1780,6 +1797,7 @@ export function useGameState() {
 
   return {
     currentRoom,
+    visitedRooms,
     room,
     roomText,
     exits,

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 
 const DIRECTIONS = ['north', 'south', 'east', 'west', 'up', 'down'];
 
-export default function TextTerminal({ room, roomText, exits, isDark, terminalLogs, onMove, onCommand }) {
+export default function TextTerminal({ room, roomText, exits, isDark, terminalLogs, onMove, onCommand, onToggleMap }) {
   const [input, setInput] = useState('');
   const logRef = useRef(null);
 
@@ -83,6 +83,22 @@ export default function TextTerminal({ room, roomText, exits, isDark, terminalLo
             </button>
           );
         })}
+
+        <button
+          onClick={onToggleMap}
+          style={{
+            background: 'rgba(20,40,20,0.8)',
+            border: '1px solid #4caf50',
+            color: '#d8f5d8',
+            fontFamily: 'inherit',
+            fontSize: 13,
+            padding: '6px 12px',
+            cursor: 'pointer',
+            borderRadius: 3,
+          }}
+        >
+          Map
+        </button>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
           <input

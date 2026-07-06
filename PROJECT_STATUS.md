@@ -56,6 +56,7 @@ Update this file when a decision or the room/item map changes meaningfully.
 | 44 | `diagnose` reports real current health and a real death count, but skips the source's wound-severity/cure-timer/survival-prediction text entirely | `V-DIAGNOSE` derives all of that from `FIGHT-STRENGTH`/`WINNER`'s `STRENGTH`/`I-CURE` - a whole strength-differential combat subsystem this game deliberately doesn't have (§1 decision 19, simple hit-point health instead). Reporting the two pieces that map cleanly onto what actually exists (`playerHealth` vs. max, `deaths`) rather than fabricating fake wound/cure numbers to fill out the rest of the source's output |
 | 45 | Automated regression suite (Vitest + `@testing-library/react`'s `renderHook`) drives the game entirely through `runCommand`/`restoreGame` rather than mocking internals | Exercises the same public surface a player (or the Playwright scripts used all session) actually uses, so the tests validate real behavior, not implementation details. `restoreGame`'s `localStorage` snapshot doubles as a test-only "teleport" to reach far-flung puzzle rooms (Treasure Room, End of Rainbow, Dome Room) without re-walking the full room graph in every test - it's the same "arbitrary state" entry point a player's own save file would produce, not a special test hook. `Math.random` is mocked deterministically per test; the one non-obvious gotcha (documented inline in `combat.test.js`) is that `randomPick()` itself burns an extra `Math.random()` call to choose flavor text, so a single combat round consumes up to 4 calls, not the 1-2 you'd guess from reading `attackTroll`/`attackThief` alone |
 | 46 | Visual atmosphere pass applied globally (postprocessing + relit lantern) rather than bespoke per-room art | User asked for "amazing visuals"; with 74 hand-built low-poly rooms, a real texture/asset overhaul isn't realistic in scope, but a `@react-three/postprocessing` `EffectComposer` (Bloom + Vignette, ACESFilmic tonemapping was already r3f's default), a `drei` `<Sky>` dome for every surface room, and a flickering lantern point light all apply once in `ViewportCanvas`/`EnvironmentLighting` and improve every room at once. Discovered along the way: three's lights are physically based (candela-scale, real inverse-square falloff) - the lantern's original `intensity={6}` (tuned for the old non-physical model) was barely reaching anything past ~2 units, so it's now `intensity=40` with a `decay={2}`/`distance={30}` falloff, plus a dim cool `ambientLight` (0.9) standing in for scotopic (dark-adapted) vision so cave walls read as dark shapes instead of flat black. A lit room's walls fading to black a few meters out is still correct (a real lantern doesn't floodlight a room) - the fix was making the *local* pool of light around the player actually look good, not eliminating falloff |
+| 47 | Auto-filling map (`MapPanel`) is a schematic node/edge diagram derived from the same `ROOMS` exit graph the game runs on, not a hand-drawn asset, and the Maze renders as a single undiscovered/solved blob rather than 19 individual rooms | User explicitly chose "blob until solved" when asked - the Maze's 15 numbered rooms + 4 dead ends are deliberately indistinguishable in the source (the whole puzzle), so mapping them individually would hand over the answer. Coordinates come from a BFS over `ROOMS` starting at West of House, walking each direction's exit by a fixed screen-space delta (north/up = -y, south/down/in = +y, east = +x, west/out = -x) - a schematic, not a geographic projection, since the real graph isn't planar (loops, one-way maze diodes, rooms reachable two different ways). `visitedRooms` (new `useGameState` array, threaded through save/restore/restart) drives what's shown - nothing renders ahead of actually being entered. The Maze is "solved" once `visitedRooms` includes Cyclops Room (only reachable by successfully navigating the maze to Maze-15) or `flags.grateUnlocked` is set (only settable from the Grating Room side, itself only reachable via Maze-11) - both are real proof the player found a way through, not just guesses. Three real bugs caught by actually running this rather than trusting the math: (1) a plain per-direction BFS grid put West of House and the Living Room on the exact same cell on a from-scratch playthrough - fixed with `nudgeToFreeCell`, an expanding spiral search, not just an exact-coordinate check; (2) that nudge needed a real minimum-distance test, not just "is this exact cell taken" - a small fixed ring of candidates still ran out once the area around the Maze got dense, so it's now a growing spiral; (3) `mirrorRoom1` and everything past it (Cold/Twisting Passage, the small cave) have no `exits` edge into them at all - the only way there is `rub mirror` (`rubMirror` in `useGameState`), a scripted teleport, not a direction - so the BFS never reached them and `MapPanel` would have crashed the moment a player standing there opened the map. Fixed by feeding that teleport into the same BFS as an explicit extra edge. Locked in with a real Vitest suite (`mapLayout.test.js`) asserting every reachable room gets a coordinate and no two rendered nodes are ever close enough to overlap |
 
 **Standing engineering practice throughout:** every UI/behavior change in this
 project has been verified by actually running the app (`npm run dev` +
@@ -68,9 +69,9 @@ shipped (see §6).
 ## 2. Current state
 
 ### 2.1 Tech stack
-- Vite + React 19 + `@react-three/fiber` 9 + `@react-three/drei` 10 + `three` 0.185
+- Vite + React 19 + `@react-three/fiber` 9 + `@react-three/drei` 10 + `@react-three/postprocessing` 3 + `three` 0.185
 - Lint: `oxlint` (`npm run lint`) — currently clean
-- No test suite yet (see backlog)
+- Tests: `vitest` (`npm test`) — 25 cases against `useGameState`, see §1 decision 45
 
 ### 2.2 File map
 ```
@@ -80,17 +81,21 @@ src/
     items.js       — item dictionary (location, portable, floorText, description, readText)
     combat.js      — verbatim HERO-MELEE/TROLL-MELEE/THIEF-MELEE flavor text
     lamp.js        — verbatim LAMP-TABLE dimming thresholds/text
+    mapLayout.js   — BFS layout (coordinates + edges + collision avoidance) for MapPanel
+    __tests__/     — mapLayout.test.js
   state/
     useGameState.js       — the engine: state + every verb handler
     useKeyboardMovement.js — WASD/arrow-key movement
+    __tests__/             — Vitest regression suite (movement/combat/persistence/puzzles)
   components/
-    App.jsx (root, wires the hook to the two panels)
-    ViewportCanvas.jsx  — R3F <Canvas>, fixed first-person camera, 3-way lighting
+    App.jsx (root, wires the hook to the two panels + MapPanel)
+    ViewportCanvas.jsx  — R3F <Canvas>, fixed first-person camera, lighting, postprocessing
     SceneManager.jsx    — looks up RoomRegistry[currentRoom]
     TextTerminal.jsx    — room text, scrolling log, direction buttons, command input
+    MapPanel.jsx        — toggleable auto-filling map overlay (see §2.8)
     rooms/              — one component per room (RoomRegistry.jsx maps id -> component)
     primitives/         — shared pieces: Ground, HouseShell, Mailbox, WindowPane, Tree,
-                           ObjectLabel (drei Html labels), LanternLight (lantern spotlight)
+                           ObjectLabel (drei Html labels), LanternLight (flickering point light)
 ```
 
 ### 2.3 Rooms implemented (74)
@@ -224,7 +229,26 @@ asset overhaul isn't in scope. On top of that baseline:
   visible before fog takes over, tight enough to still feel like a cave.
 
 ### 2.8 Map and hints
-_(filled in once built - see backlog)_
+Both are new meta/UX features requested directly by the user, not sourced
+from the ZIL source - the accuracy-first content policy (§1 decision 3)
+governs simulated game-world text and mechanics, not UI tooling layered
+on top of it, so these are deliberate additions rather than deviations.
+
+- **Map** (`src/components/MapPanel.jsx`, `src/gameData/mapLayout.js`) -
+  a toggleable overlay (the "Map" button in `TextTerminal`) showing every
+  room the player has actually entered (`visitedRooms`) as a node, with
+  edges from the real room graph, current room highlighted, and each
+  node/edge animating in staggered by true discovery order when the
+  panel opens. The Maze collapses to one blob node - see §1 decision 47.
+  Node positions run through a collision-avoidance pass (`nudgeToFreeCell`
+  in `mapLayout.js`, an expanding spiral search) since a plain BFS grid
+  layout put two real rooms exactly on top of each other on the very
+  first playthrough (West of House and the Living Room happened to sum
+  to the same delta). Known limitation: it's a schematic, not a scaled
+  map - edges can cross, and "north on the map" doesn't always match
+  compass-north in the fiction once a room is nudged off its raw grid
+  cell to avoid a collision.
+- **Hints**: _(filled in once built - see backlog)_
 
 ---
 
@@ -255,7 +279,7 @@ room text or mechanics from memory.
 16. ~~**Egg fragility**~~ — done. `open egg` refuses without a tool or breaks it with the knife (verbatim `EGG-OBJECT`/`BAD-EGG` text, mutating the same item's fields in place - §1 decision 37); a new generalized `give <item> to thief` verb (§1 decision 38) lets you hand him the egg instead, and killing him then opens it safely and reveals the canary (`EGG-SOLVE`). The canary's own `WIND`/forest-bird/bauble follow-on chain isn't modeled - see §2.6
 
 ### Housekeeping / non-gameplay
-17. ~~No automated test suite~~ — done. `npm test` runs 25 Vitest cases across `src/state/__tests__/` (`movement`, `combat`, `persistence`, `puzzles`), covering movement/blocked-exits/grue death, mailbox/inventory sync, lamp dimming through real burnout at turn 186, restart Y/N confirmation, troll and thief combat (including the disarm-and-bounce-to-Cellar loss case and the multi-hit thief kill), save/restore round-tripping through real `localStorage`, the two-strikes-then-permadeath death cycle with inventory scattering, trophy case scoring, egg fragility (refuse/break/give-to-thief-safely), and the sceptre/rainbow puzzle (including its fatal on-rainbow case). Manual Playwright checks remain how new 3D room components and visual regressions get verified - this suite is for the game-logic layer (`useGameState`), not rendering. See §1 decision 45
+17. ~~No automated test suite~~ — done. `npm test` runs 30 Vitest cases: 25 across `src/state/__tests__/` (`movement`, `combat`, `persistence`, `puzzles`), covering movement/blocked-exits/grue death, mailbox/inventory sync, lamp dimming through real burnout at turn 186, restart Y/N confirmation, troll and thief combat (including the disarm-and-bounce-to-Cellar loss case and the multi-hit thief kill), save/restore round-tripping through real `localStorage`, the two-strikes-then-permadeath death cycle with inventory scattering, trophy case scoring, egg fragility (refuse/break/give-to-thief-safely), and the sceptre/rainbow puzzle (including its fatal on-rainbow case); plus 5 in `src/gameData/__tests__/mapLayout.test.js` guarding the map layout itself (every reachable room gets a coordinate, the Maze collapses correctly, no two rendered nodes ever overlap). Manual Playwright checks remain how new 3D room components and visual regressions get verified - this suite is for the game-logic layer, not rendering. See §1 decisions 45 and 47
 18. ~~Bundle size warning~~ — addressed, not "fixed" by shrinking the download. `three`/`@react-three/fiber`/`@react-three/drei` are the entire bulk of the bundle and always load together (there's no lazy-load boundary - the 3D canvas is needed immediately), so `vite.config.js` now splits them into their own `vendor` chunk via `manualChunks` and raises `chunkSizeWarningLimit` to 1200. Real benefit: app code (now ~117kB) is isolated from the ~1MB vendor chunk, so deploys that only touch game code don't invalidate visitors' cached vendor bundle. Verified against an actual production build (`vite build` + `vite preview`), not just the dev server, since chunking only applies there
 19. ~~`legacy-vanilla/`~~ — deleted. It was the original 2-room single-file prototype, fully superseded since the Vite/React migration (decision #5); nobody had needed to diff against it in a very long time
 
