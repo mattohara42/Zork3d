@@ -9,6 +9,12 @@ npm install
 npm run dev
 ```
 
+Run the regression suite (Vitest, covers `src/state/useGameState.js`) with:
+
+```
+npm test
+```
+
 ## Structure
 
 - `src/gameData/` — room and item dictionaries. Room text is sourced from
