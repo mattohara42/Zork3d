@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import Ground, { GROUND_Y } from '../primitives/Ground';
+import ObjectLabel from '../primitives/ObjectLabel';
 
 const RAINBOW_COLORS = ['#e53935', '#fb8c00', '#fdd835', '#43a047', '#1e88e5', '#8e24aa'];
 
@@ -17,7 +19,36 @@ function Rainbow() {
   );
 }
 
-export default function EndOfRainbow() {
+// Only appears once the sceptre has been waved here (flags.rainbowFlag).
+function PotOfGold({ onInteract }) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <group position={[-1.3, GROUND_Y + 0.05, -3.2]}>
+      <mesh
+        onClick={(e) => {
+          e.stopPropagation();
+          onInteract('pot of gold', 'take');
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHovered(true);
+          document.body.style.cursor = 'pointer';
+        }}
+        onPointerOut={() => {
+          setHovered(false);
+          document.body.style.cursor = 'auto';
+        }}
+      >
+        <cylinderGeometry args={[0.28, 0.22, 0.3, 12]} />
+        <meshStandardMaterial color={hovered ? '#ffd700' : '#c9a227'} />
+      </mesh>
+      <ObjectLabel text="pot of gold" visible={hovered} position={[0, 0.5, 0]} />
+    </group>
+  );
+}
+
+export default function EndOfRainbow({ items, onInteract }) {
   return (
     <group>
       <Ground color="#c9b896" size={7} />
@@ -26,6 +57,7 @@ export default function EndOfRainbow() {
         <meshStandardMaterial color="#3a6a8a" />
       </mesh>
       <Rainbow />
+      {items.potOfGold.location === 'endOfRainbow' && <PotOfGold onInteract={onInteract} />}
     </group>
   );
 }

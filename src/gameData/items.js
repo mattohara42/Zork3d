@@ -186,4 +186,74 @@ export const INITIAL_ITEMS = {
     tvalue: 5,
     location: 'treasureRoom',
   },
+
+  // Starts closed (no OPENBIT in the source) - `open coffin` reveals the
+  // sceptre inside (see useGameState's openObject). SACREDBIT/the
+  // COFFIN-CURE mechanic (South Temple won't let you carry it down to
+  // Tiny Cave) is handled by southTemple's own exitGuard in rooms.js.
+  coffin: {
+    id: 'coffin',
+    name: 'coffin',
+    description: 'A solid-gold coffin.',
+    floorText: 'The solid-gold coffin used for the burial of Ramses II is here.',
+    portable: true,
+    value: 10,
+    tvalue: 15,
+    location: 'egyptRoom',
+  },
+
+  // Starts hidden inside the coffin (location 'insideCoffin' is never a
+  // real room) until the coffin is opened.
+  sceptre: {
+    id: 'sceptre',
+    name: 'sceptre',
+    description: 'An ornamented sceptre, tapering to a sharp point.',
+    floorText:
+      'A sceptre, possibly that of ancient Egypt itself, is in the coffin. The sceptre is ornamented with colored enamel, and tapers to a sharp point.',
+    portable: true,
+    value: 4,
+    tvalue: 6,
+    location: 'insideCoffin',
+  },
+
+  // A real treasure, but not modeled as an alternate light source (the
+  // source's torch is FLAMEBIT/ONBIT/LIGHTBIT - always-lit and usable
+  // like the lamp) - see PROJECT_STATUS.md.
+  torch: {
+    id: 'torch',
+    name: 'torch',
+    description: 'A flaming torch, made of ivory.',
+    floorText: 'Sitting on the pedestal is a flaming torch, made of ivory.',
+    portable: true,
+    value: 14,
+    tvalue: 6,
+    location: 'torchRoom',
+  },
+
+  // NDESCBIT/SACREDBIT in the source (no separate FDESC) - decorative
+  // and readable only, not takeable.
+  prayer: {
+    id: 'prayer',
+    name: 'prayer',
+    description: 'An ancient inscription.',
+    readText:
+      'The prayer is inscribed in an ancient script, rarely used today. It seems to be a philippic against small insects, absent-mindedness, and the picking up and dropping of small objects. The final verse consigns trespassers to the land of the dead. All evidence indicates that the beliefs of the ancient Zorkers were obscure.',
+    portable: false,
+    location: 'northTemple',
+  },
+
+  // INVISIBLE until the sceptre is waved at End of Rainbow (or, in the
+  // source, Aragain Falls - not built) - see wave's handling in
+  // useGameState. `insideEgg`-style non-room location stands in for
+  // INVISIBLE here, same trick used for the canary.
+  potOfGold: {
+    id: 'potOfGold',
+    name: 'pot of gold',
+    description: 'A shimmering pot of gold.',
+    floorText: 'At the end of the rainbow is a pot of gold.',
+    portable: true,
+    value: 10,
+    tvalue: 10,
+    location: 'notYetRevealed',
+  },
 };

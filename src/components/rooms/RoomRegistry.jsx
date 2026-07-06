@@ -39,6 +39,21 @@ import DamRoom from './DamRoom';
 import DamLobby from './DamLobby';
 import MaintenanceRoom from './MaintenanceRoom';
 import DamBase from './DamBase';
+import NarrowPassage from './NarrowPassage';
+import MirrorRoom from './MirrorRoom';
+import WindingPassage from './WindingPassage';
+import TinyCave from './TinyCave';
+import EntranceToHades from './EntranceToHades';
+import ColdPassage from './ColdPassage';
+import TwistingPassage from './TwistingPassage';
+import SmallCave from './SmallCave';
+import EngravingsCave from './EngravingsCave';
+import DomeRoom from './DomeRoom';
+import TorchRoom from './TorchRoom';
+import NorthTemple from './NorthTemple';
+import EgyptRoom from './EgyptRoom';
+import SouthTemple from './SouthTemple';
+import OnRainbow from './OnRainbow';
 
 const MAZE_ROOM_IDS = [
   'maze1', 'maze2', 'maze3', 'maze4', 'maze5', 'maze6', 'maze7',
@@ -86,6 +101,22 @@ export const RoomRegistry = {
   damLobby: (props) => <DamLobby {...props} />,
   maintenanceRoom: (props) => <MaintenanceRoom {...props} />,
   damBase: (props) => <DamBase {...props} />,
+  narrowPassage: (props) => <NarrowPassage {...props} />,
+  mirrorRoom1: (props) => <MirrorRoom {...props} />,
+  mirrorRoom2: (props) => <MirrorRoom {...props} />,
+  windingPassage: (props) => <WindingPassage {...props} />,
+  tinyCave: (props) => <TinyCave {...props} />,
+  entranceToHades: (props) => <EntranceToHades {...props} />,
+  coldPassage: (props) => <ColdPassage {...props} />,
+  twistingPassage: (props) => <TwistingPassage {...props} />,
+  smallCave: (props) => <SmallCave {...props} />,
+  engravingsCave: (props) => <EngravingsCave {...props} />,
+  domeRoom: (props) => <DomeRoom {...props} />,
+  torchRoom: (props) => <TorchRoom {...props} />,
+  northTemple: (props) => <NorthTemple {...props} />,
+  egyptRoom: (props) => <EgyptRoom {...props} />,
+  southTemple: (props) => <SouthTemple {...props} />,
+  onRainbow: (props) => <OnRainbow {...props} />,
   ...Object.fromEntries(
     MAZE_ROOM_IDS.map((id) => [id, (props) => <MazeRoom roomId={id} {...props} />])
   ),

@@ -385,6 +385,12 @@ export const ROOMS = {
   // puzzle not built yet) - without a cardinal remap this would be a
   // genuine dead end, so SW maps to south rather than being silently
   // dropped like the house ring's redundant diagonals are.
+  // Canon's up/NE/east all lead to On the Rainbow once RAINBOW-FLAG is
+  // set (waving the sceptre here or at Aragain Falls) - collapsed to one
+  // cardinal, east, since they're otherwise redundant. Aragain Falls
+  // itself (upstream, past the falls) needs the river/boat system, not
+  // built - so this is the only way to reach On the Rainbow/the pot of
+  // gold, not a shortcut alongside a river route.
   endOfRainbow: {
     id: 'endOfRainbow',
     environment: 'surface',
@@ -395,7 +401,30 @@ export const ROOMS = {
       'White Cliffs. The river canyon opens here and sunlight shines in from ' +
       'above. A rainbow crosses over the falls to the east and a narrow path ' +
       'continues to the southwest.',
-    exits: { south: 'canyonBottom' },
+    exits: { south: 'canyonBottom', east: 'onRainbow' },
+    exitGuards: {
+      east: (flags) => (flags.rainbowFlag ? null : "You can't go that way."),
+    },
+  },
+
+  onRainbow: {
+    id: 'onRainbow',
+    environment: 'surface',
+    name: 'On the Rainbow',
+    text:
+      'You are on top of a rainbow (I bet you never thought you would walk ' +
+      'on a rainbow), with a magnificent view of the Falls. The rainbow ' +
+      'travels east-west here.',
+    exits: { west: 'endOfRainbow' },
+    // Canon's east leads to Aragain Falls, reachable otherwise only via
+    // the river/boat system - not built, so blocked here rather than
+    // offering a shortcut that skips a whole unbuilt subsystem. Waving
+    // the sceptre while standing here is also fatal in canon (the
+    // rainbow's structural integrity fails under you) - see wave's own
+    // handling in useGameState.
+    blockedExits: {
+      east: 'The mist and roar of the falls make it impossible to continue in that direction.',
+    },
   },
 
   // The Maze: 15 numbered rooms, 4 dead ends, and the Grating Room, past
@@ -738,13 +767,22 @@ export const ROOMS = {
     onEnter: (flags) => (flags.ewPassageVisited ? null : { flagUpdates: { ewPassageVisited: true }, scoreBonus: 5 }),
   },
 
+  // Canon's S (Narrow Passage) and SE (Engravings Cave) are both real,
+  // separate exits - SE has no cardinal alternative on this room, so it's
+  // remapped to the only cardinal still free here, down.
   roundRoom: {
     id: 'roundRoom',
     environment: 'underground',
     name: 'Round Room',
     text: 'This is a circular stone room with passages in all directions. Several of them have unfortunately been blocked by cave-ins.',
     dark: true,
-    exits: { east: 'loudRoom', west: 'ewPassage', north: 'nsPassage', south: null },
+    exits: {
+      east: 'loudRoom',
+      west: 'ewPassage',
+      north: 'nsPassage',
+      south: 'narrowPassage',
+      down: 'engravingsCave',
+    },
   },
 
   // NE (no cardinal alt) mapped to east.
@@ -873,5 +911,222 @@ export const ROOMS = {
       'stretching from north to south along the shores of the river as ' +
       'it winds its way downstream.',
     exits: { north: 'damRoom', up: 'damRoom' },
+  },
+
+  // The Temple/Egyptian Room complex (Round Room's `down`) and the
+  // Mirror Room maze (Round Room's `south`) - built together because in
+  // canon the *only* way back out of the Temple side is through here:
+  // South Temple's `down` (needs COFFIN-CURE) lands in the same Tiny
+  // Cave this maze already reaches from Narrow Passage. `pray` at South
+  // Temple is also a real, separate emergency exit straight to Forest 1.
+  // Not modeled: the Entrance to Hades exorcism ritual (bell/candle/book)
+  // and the Land of the Living Dead beyond it, Slide Room/Atlantis
+  // Room/the reservoir-boat network past Small Cave, and the mirror's
+  // MUNG-it-and-get-cursed side path - see PROJECT_STATUS.md.
+  narrowPassage: {
+    id: 'narrowPassage',
+    environment: 'underground',
+    name: 'Narrow Passage',
+    text:
+      'This is a long and narrow corridor where a long north-south ' +
+      'passageway briefly narrows even further.',
+    dark: true,
+    exits: { north: 'roundRoom', south: 'mirrorRoom2' },
+  },
+
+  // ONBIT in the source - lit, unlike its twin Mirror Room 1.
+  mirrorRoom2: {
+    id: 'mirrorRoom2',
+    environment: 'underground',
+    name: 'Mirror Room',
+    text:
+      'You are in a large square room with tall ceilings. On the south ' +
+      'wall is an enormous mirror which fills the entire wall. There ' +
+      'are exits on the other three sides of the room.',
+    exits: { west: 'windingPassage', north: 'narrowPassage', east: 'tinyCave' },
+  },
+
+  windingPassage: {
+    id: 'windingPassage',
+    environment: 'underground',
+    name: 'Winding Passage',
+    text: 'This is a winding passage. It seems that there are only exits on the east and north.',
+    dark: true,
+    exits: { north: 'mirrorRoom2', east: 'tinyCave' },
+  },
+
+  tinyCave: {
+    id: 'tinyCave',
+    environment: 'underground',
+    name: 'Cave',
+    text:
+      'This is a tiny cave with entrances west and north, and a dark, ' +
+      'forbidding staircase leading down.',
+    dark: true,
+    exits: { north: 'mirrorRoom2', west: 'windingPassage', down: 'entranceToHades' },
+  },
+
+  // The exorcism ritual (bell/candle/book) that lets you past the gate
+  // into the Land of the Living Dead isn't modeled - see the file header
+  // comment above. South is a real exit in the source (also reachable
+  // from IN), gated on LLD-FLAG; blocked here since that flag can never
+  // become true without the ritual.
+  entranceToHades: {
+    id: 'entranceToHades',
+    environment: 'underground',
+    name: 'Entrance to Hades',
+    text:
+      'You are outside a large gateway, on which is inscribed\n' +
+      '  Abandon every hope\n' +
+      'all ye who enter here!\n' +
+      "The gate is open; through it you can see a desolation, with a pile of " +
+      'mangled bodies in one corner. Thousands of voices, lamenting some ' +
+      'hideous fate, can be heard.\n' +
+      'The way through the gate is barred by evil spirits, who jeer at your ' +
+      'attempts to pass.',
+    dark: true,
+    exits: { up: 'tinyCave' },
+    blockedExits: {
+      south: 'The way through the gate is barred by evil spirits, who jeer at your attempts to pass.',
+    },
+  },
+
+  // No ONBIT - dark, unlike Mirror Room 2.
+  mirrorRoom1: {
+    id: 'mirrorRoom1',
+    environment: 'underground',
+    name: 'Mirror Room',
+    text:
+      'You are in a large square room with tall ceilings. On the south ' +
+      'wall is an enormous mirror which fills the entire wall. There ' +
+      'are exits on the other three sides of the room.',
+    dark: true,
+    exits: { north: 'coldPassage', west: 'twistingPassage', east: 'smallCave' },
+  },
+
+  // West (Slide Room, a shortcut to the Cellar tangled up in a separate
+  // timber/bank-heist puzzle) isn't built - blocked rather than faked.
+  coldPassage: {
+    id: 'coldPassage',
+    environment: 'underground',
+    name: 'Cold Passage',
+    text:
+      'This is a cold and damp corridor where a long east-west ' +
+      'passageway turns into a southward path.',
+    dark: true,
+    exits: { south: 'mirrorRoom1' },
+    blockedExits: { west: 'It is too cold to continue that way.' },
+  },
+
+  twistingPassage: {
+    id: 'twistingPassage',
+    environment: 'underground',
+    name: 'Twisting Passage',
+    text: 'This is a winding passage. It seems that there are only exits on the east and north.',
+    dark: true,
+    exits: { north: 'mirrorRoom1', east: 'smallCave' },
+  },
+
+  // Canon's down/south both lead to Atlantis Room (needs the reservoir/
+  // boat system, not built) - collapsed to one blocked direction.
+  smallCave: {
+    id: 'smallCave',
+    environment: 'underground',
+    name: 'Cave',
+    text: 'This is a tiny cave with entrances west and north, and a staircase leading down.',
+    dark: true,
+    exits: { north: 'mirrorRoom1', west: 'twistingPassage' },
+    blockedExits: { down: 'The staircase is flooded beyond this point.' },
+  },
+
+  // NW (no cardinal alt) mapped to up, matching the room's own downward
+  // relationship to Round Room above it.
+  engravingsCave: {
+    id: 'engravingsCave',
+    environment: 'underground',
+    name: 'Engravings Cave',
+    text: 'You have entered a low cave with passages leading northwest and east.',
+    dark: true,
+    exits: { up: 'roundRoom', east: 'domeRoom' },
+  },
+
+  domeRoom: {
+    id: 'domeRoom',
+    environment: 'underground',
+    name: 'Dome Room',
+    text: (flags) =>
+      'You are at the periphery of a large dome, which forms the ceiling ' +
+      'of another room below. Protecting you from a precipitous drop is a ' +
+      'wooden railing which circles the dome.' +
+      (flags.domeFlag
+        ? '\nHanging down from the railing is a rope which ends about ten feet from the floor below.'
+        : ''),
+    dark: true,
+    exits: { west: 'engravingsCave', down: 'torchRoom' },
+    exitGuards: {
+      down: (flags) => (flags.domeFlag ? null : 'You cannot go down without fracturing many bones.'),
+    },
+  },
+
+  torchRoom: {
+    id: 'torchRoom',
+    environment: 'underground',
+    name: 'Torch Room',
+    text: (flags) =>
+      'This is a large room with a prominent doorway leading to a down ' +
+      'staircase. Above you is a large dome. Up around the edge of the ' +
+      'dome (20 feet up) is a wooden railing. In the center of the room ' +
+      'sits a white marble pedestal.' +
+      (flags.domeFlag
+        ? '\nA piece of rope descends from the railing above, ending some five feet above your head.'
+        : ''),
+    dark: true,
+    exits: { south: 'northTemple' },
+    blockedExits: { up: 'You cannot reach the rope.' },
+  },
+
+  // ONBIT + SACREDBIT in the source - lit like the Gallery/Dam Room.
+  // Canon's OUT/UP/NORTH (all to Torch Room) and DOWN/EAST (both to
+  // Egyptian Room) are each collapsed to one direction.
+  northTemple: {
+    id: 'northTemple',
+    environment: 'underground',
+    name: 'Temple',
+    text:
+      'This is the north end of a large temple. On the east wall is an ' +
+      'ancient inscription, probably a prayer in a long-forgotten ' +
+      'language. Below the prayer is a staircase leading down. The west ' +
+      'wall is solid granite. The exit to the north end of the room is ' +
+      'through huge marble pillars.',
+    exits: { north: 'torchRoom', east: 'egyptRoom', south: 'southTemple' },
+  },
+
+  // Canon's WEST/UP (both to North Temple) collapsed to one direction.
+  egyptRoom: {
+    id: 'egyptRoom',
+    environment: 'underground',
+    name: 'Egyptian Room',
+    text: 'This is a room which looks like an Egyptian tomb. There is an ascending staircase to the west.',
+    dark: true,
+    exits: { west: 'northTemple' },
+  },
+
+  // ONBIT + SACREDBIT - lit. `down` needs COFFIN-CURE (not carrying the
+  // coffin) - matches SOUTH-TEMPLE-FCN exactly, recomputed live off
+  // current inventory rather than a one-time flag.
+  southTemple: {
+    id: 'southTemple',
+    environment: 'underground',
+    name: 'Altar',
+    text:
+      'This is the south end of a large temple. In front of you is what ' +
+      'appears to be an altar. In one corner is a small hole in the ' +
+      'floor which leads into darkness. You probably could not get back ' +
+      'up it.',
+    exits: { north: 'northTemple', down: 'tinyCave' },
+    exitGuards: {
+      down: (flags, inventory) =>
+        inventory.includes('coffin') ? "You haven't a prayer of getting the coffin down there." : null,
+    },
   },
 };

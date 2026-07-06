@@ -50,9 +50,10 @@ const LAMP_OFF_COMMANDS = ['turn off lamp', 'extinguish lamp', 'douse lamp'];
 const HELP_TEXT =
   'Commands: north/south/east/west/up/down/in/out (or n/s/e/w/u/d), look, ' +
   'examine <thing>, open/close <thing>, lock/unlock <thing>, take/drop ' +
-  '<thing>, put <thing> in case, give <thing> to <someone>, read <thing>, ' +
-  'move <thing>, attack/kill <thing>, inventory, score, light lamp / turn ' +
-  'off lamp, save, restore, restart.';
+  '<thing>, put <thing> in case, give <thing> to <someone>, tie <thing> ' +
+  'to <thing>, untie <thing>, wave <thing>, rub <thing>, pray, read ' +
+  '<thing>, move <thing>, attack/kill <thing>, inventory, score, light ' +
+  'lamp / turn off lamp, save, restore, restart.';
 
 function resolveRoomText(room, flags, items, currentRoom) {
   const base = typeof room.text === 'function' ? room.text(flags) : room.text;
@@ -97,6 +98,12 @@ const INITIAL_FLAGS = {
   // him beforehand via `give egg to thief`) - the only way to open it
   // without damaging it.
   eggOpenedSafely: false,
+  // DOME-FLAG: rope tied to the Dome Room's railing, reachable from below
+  // (Torch Room) - see turnBolt-style `tie`/`untie` handling.
+  domeFlag: false,
+  // RAINBOW-FLAG: the rainbow is solid and crossable (wave the sceptre at
+  // End of Rainbow) - reveals the pot of gold there too.
+  rainbowFlag: false,
 };
 
 /**
@@ -566,6 +573,20 @@ export function useGameState() {
           }
         } else {
           log('You have neither the tools nor the expertise to open it without damaging it.');
+        }
+        return;
+      }
+      if (noun === 'coffin' || noun === 'casket') {
+        if (!isItemReachable(items.coffin)) {
+          log("You don't see that here.");
+        } else if (items.sceptre.location !== 'insideCoffin') {
+          log('It is already open.');
+        } else {
+          log('Opening the coffin reveals a sceptre.');
+          setItems((prev) => ({ ...prev, sceptre: { ...prev.sceptre, location: prev.coffin.location } }));
+          if (items.coffin.location === 'inventory') {
+            setInventory((prev) => [...prev, 'sceptre']);
+          }
         }
         return;
       }
@@ -1154,6 +1175,116 @@ export function useGameState() {
     [currentRoom, flags.maintenanceLightsOn, log]
   );
 
+  /** ROPE-FUNCTION's TIE/UNTIE: only the rope-to-railing case in Dome Room matters here. */
+  const tieItem = useCallback(
+    (noun, targetNoun) => {
+      if (noun !== 'rope') {
+        log("You can't tie that to anything.");
+        return;
+      }
+      if (currentRoom !== 'domeRoom') {
+        log("You can't tie the rope to that.");
+        return;
+      }
+      if (targetNoun !== 'railing' && targetNoun !== 'rail') {
+        log("You can't tie the rope to that.");
+        return;
+      }
+      if (!inventory.includes('rope')) {
+        log("You don't have that.");
+        return;
+      }
+      if (flags.domeFlag) {
+        log('The rope is already tied to it.');
+        return;
+      }
+      setFlags((prev) => ({ ...prev, domeFlag: true }));
+      log('The rope drops over the side and comes within ten feet of the floor.');
+    },
+    [currentRoom, inventory, flags.domeFlag, log]
+  );
+
+  const untieItem = useCallback(
+    (noun) => {
+      if (noun !== 'rope' || currentRoom !== 'domeRoom') {
+        log("It's not attached to that.");
+        return;
+      }
+      if (!flags.domeFlag) {
+        log('It is not tied to anything.');
+        return;
+      }
+      setFlags((prev) => ({ ...prev, domeFlag: false }));
+      log('The rope is now untied.');
+    },
+    [currentRoom, flags.domeFlag, log]
+  );
+
+  /**
+   * SCEPTRE-FUNCTION: waving it at End of Rainbow makes the rainbow solid
+   * (and reveals the pot of gold), waving again undoes it, and waving it
+   * while actually standing on the rainbow is fatal - its "structural
+   * integrity" fails under you. Aragain Falls isn't built (needs the
+   * river/boat system), so only End of Rainbow/On the Rainbow matter here.
+   */
+  const waveSceptre = useCallback(() => {
+    if (!inventory.includes('sceptre')) {
+      log("You don't have that.");
+      return;
+    }
+    if (currentRoom === 'onRainbow') {
+      handleDeath(
+        'The structural integrity of the rainbow is severely compromised, leaving you hanging in midair, supported only by water vapor. Bye.'
+      );
+      return;
+    }
+    if (currentRoom !== 'endOfRainbow') {
+      log('A dazzling display of color briefly emanates from the sceptre.');
+      return;
+    }
+    if (!flags.rainbowFlag) {
+      setFlags((prev) => ({ ...prev, rainbowFlag: true }));
+      log(
+        'Suddenly, the rainbow appears to become solid and, I venture, walkable (I think the giveaway was the stairs and bannister).'
+      );
+      if (items.potOfGold.location === 'notYetRevealed') {
+        setItems((prev) => ({ ...prev, potOfGold: { ...prev.potOfGold, location: 'endOfRainbow' } }));
+        log('A shimmering pot of gold appears at the end of the rainbow.');
+      }
+    } else {
+      setFlags((prev) => ({ ...prev, rainbowFlag: false }));
+      log('The rainbow seems to have become somewhat run-of-the-mill.');
+    }
+  }, [currentRoom, inventory, flags.rainbowFlag, items.potOfGold.location, handleDeath, log]);
+
+  /** V-PRAY: only South Temple's real escape hatch does anything. */
+  const prayVerb = useCallback(() => {
+    if (currentRoom === 'southTemple') {
+      setCurrentRoom('forest1');
+      return;
+    }
+    log('If you pray enough, your prayers may be answered.');
+  }, [currentRoom, log]);
+
+  /**
+   * MIRROR-MIRROR, simplified: teleports the player between the two
+   * Mirror Rooms. The source also swaps the two rooms' physical contents
+   * (so anything left behind reappears in the other room too) - not
+   * modeled, since nothing in this game is likely to be left in either
+   * room specifically for that to matter.
+   */
+  const rubMirror = useCallback(() => {
+    if (currentRoom === 'mirrorRoom2') {
+      setCurrentRoom('mirrorRoom1');
+      log('There is a rumble from deep within the earth and the room shakes.');
+    } else if (currentRoom === 'mirrorRoom1') {
+      setCurrentRoom('mirrorRoom2');
+      log('There is a rumble from deep within the earth and the room shakes.');
+    } else {
+      log("You don't see that here.");
+    }
+  }, [currentRoom, log]);
+
   const examineObject = useCallback(
     (noun) => {
       if (noun === 'mailbox') {
@@ -1376,6 +1507,7 @@ export function useGameState() {
         case 'lock': lockGrate(); break;
         case 'turn': turnBolt(); break;
         case 'push': pushButton(objectName); break;
+        case 'rub': rubMirror(); break;
         default: log('Nothing happens.');
       }
     },
@@ -1393,6 +1525,7 @@ export function useGameState() {
       lockGrate,
       turnBolt,
       pushButton,
+      rubMirror,
       log,
       incrementMoves,
       gameOver,
@@ -1512,8 +1645,18 @@ export function useGameState() {
           );
           break;
         }
-        case 'move':
-        case 'raise': incrementMoves(); moveObject(noun); break;
+        case 'move': incrementMoves(); moveObject(noun); break;
+        case 'raise':
+        case 'wave':
+          incrementMoves();
+          if (noun === 'sceptre') {
+            waveSceptre();
+          } else if (verb === 'raise') {
+            moveObject(noun);
+          } else {
+            log('Nothing happens.');
+          }
+          break;
         case 'push':
           incrementMoves();
           if (noun.includes('button')) {
@@ -1523,6 +1666,19 @@ export function useGameState() {
           }
           break;
         case 'turn': incrementMoves(); turnBolt(); break;
+        case 'tie': {
+          incrementMoves();
+          const match = noun.match(/^(.*?)\s+to\s+(.*)$/);
+          if (!match) {
+            log('Tie it to what?');
+            break;
+          }
+          tieItem(match[1].trim().replace(/^the\s+/, ''), match[2].trim().replace(/^the\s+/, ''));
+          break;
+        }
+        case 'untie': incrementMoves(); untieItem(noun); break;
+        case 'pray': incrementMoves(); prayVerb(); break;
+        case 'rub': incrementMoves(); rubMirror(); break;
         case 'examine':
         case 'x':
         case 'look': incrementMoves(); examineObject(noun); break;
@@ -1575,6 +1731,11 @@ export function useGameState() {
       sayUlysses,
       turnBolt,
       pushButton,
+      tieItem,
+      untieItem,
+      waveSceptre,
+      prayVerb,
+      rubMirror,
       currentRoom,
       flags.cyclopsFled,
       incrementMoves,
