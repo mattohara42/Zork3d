@@ -1,17 +1,23 @@
 import { useState } from 'react';
 import Ground, { GROUND_Y } from '../primitives/Ground';
 import ObjectLabel from '../primitives/ObjectLabel';
+import { TreasureChest } from '../3d/VisualKit';
 
 const GOLD_COLOR = '#c8a838';
+const GOLD_TRIM_COLOR = '#f0d878';
 
+// Built from TreasureChest rather than a plain box - both the wood and
+// trim colors are pushed to gold so the "solid-gold coffin" reads as
+// gold overall, not a wood chest with gold accents. Click/hover stay on
+// this wrapping group (TreasureChest itself has no interaction of its
+// own) so the existing take/open dispatch didn't need to change at all.
 function Coffin({ items, onInteract }) {
   const [hovered, setHovered] = useState(false);
   const open = items.sceptre.location !== 'insideCoffin';
 
   return (
     <group position={[0, GROUND_Y, -3.5]}>
-      <mesh
-        position={[0, 0.35, 0]}
+      <group
         onClick={(e) => {
           e.stopPropagation();
           onInteract('coffin', open ? 'take' : 'open');
@@ -26,10 +32,16 @@ function Coffin({ items, onInteract }) {
           document.body.style.cursor = 'auto';
         }}
       >
-        <boxGeometry args={[1.6, 0.7, 0.7]} />
-        <meshStandardMaterial color={hovered ? '#e8c860' : GOLD_COLOR} metalness={0.6} />
-      </mesh>
-      <ObjectLabel text="coffin" visible={hovered} position={[0, 0.8, 0]} />
+        <TreasureChest
+          width={1.6}
+          depth={0.7}
+          baseHeight={0.5}
+          isOpen={open}
+          woodColor={GOLD_COLOR}
+          goldColor={GOLD_TRIM_COLOR}
+        />
+      </group>
+      <ObjectLabel text="coffin" visible={hovered} position={[0, 0.9, 0]} />
     </group>
   );
 }

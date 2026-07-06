@@ -1,4 +1,5 @@
 import Ground, { GROUND_Y } from '../primitives/Ground';
+import { DungeonWall } from '../3d/VisualKit';
 
 const WALL_COLOR = '#4a453f';
 const WALL_HEIGHT = 3;
@@ -14,20 +15,14 @@ export default function Cellar() {
     <group>
       <Ground color="#3a3226" size={9} />
 
-      <mesh position={[4.5, WALL_CENTER_Y, 0]}>
-        <boxGeometry args={[0.2, WALL_HEIGHT, 9]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
+      <DungeonWall position={[4.5, WALL_CENTER_Y, 0]} height={WALL_HEIGHT} color={WALL_COLOR} />
 
       {/* The unclimbable metal ramp, against the west wall */}
       <mesh position={[-3.5, GROUND_Y + 0.9, -1.5]} rotation={[0, 0, -0.5]}>
         <boxGeometry args={[2.6, 0.15, 1.6]} />
         <meshStandardMaterial color="#8a8f96" />
       </mesh>
-      <mesh position={[-4.5, WALL_CENTER_Y, 0]}>
-        <boxGeometry args={[0.2, WALL_HEIGHT, 9]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
+      <DungeonWall position={[-4.5, WALL_CENTER_Y, 0]} height={WALL_HEIGHT} color={WALL_COLOR} />
     </group>
   );
 }

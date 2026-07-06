@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Ground, { GROUND_Y } from '../primitives/Ground';
 import ObjectLabel from '../primitives/ObjectLabel';
+import { DungeonWall } from '../3d/VisualKit';
 
 const WALL_COLOR = '#3f3a35';
 const WALL_HEIGHT = 3;
@@ -90,14 +91,8 @@ export default function TrollRoom({ flags, items, onInteract }) {
     <group>
       <Ground color="#332e28" size={9} />
 
-      <mesh position={[-4.5, WALL_CENTER_Y, 0]}>
-        <boxGeometry args={[0.2, WALL_HEIGHT, 9]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
-      <mesh position={[4.5, WALL_CENTER_Y, 0]}>
-        <boxGeometry args={[0.2, WALL_HEIGHT, 9]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
+      <DungeonWall position={[-4.5, WALL_CENTER_Y, 0]} height={WALL_HEIGHT} color={WALL_COLOR} />
+      <DungeonWall position={[4.5, WALL_CENTER_Y, 0]} height={WALL_HEIGHT} color={WALL_COLOR} />
 
       {!flags.trollDefeated && <Troll onInteract={onInteract} />}
       {items.sword.location === 'trollRoom' && <DroppedSword onInteract={onInteract} />}

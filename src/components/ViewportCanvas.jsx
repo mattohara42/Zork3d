@@ -56,7 +56,14 @@ export default function ViewportCanvas({
   lanternLit,
   onInteract,
 }) {
-  const backgroundColor = isDark || isUnderground ? DARK_COLOR : SKY_COLOR;
+  // isDark/isUnderground alone miss one real case: a naturally-lit
+  // underground room (Gallery, the Dam rooms, both Temples - ONBIT in
+  // the source) has room.dark===false, so both booleans are false even
+  // though there's still no sky down there. Falling through to SKY_COLOR
+  // showed a bright outdoor gradient bleeding through any open exit in
+  // those rooms - caught by actually looking at South Temple after
+  // adding its archway, not something the archway itself caused.
+  const backgroundColor = isDark || isUnderground || environment === 'underground' ? DARK_COLOR : SKY_COLOR;
 
   return (
     <div style={{ flex: '0 0 65%', width: '100%', background: backgroundColor }}>
