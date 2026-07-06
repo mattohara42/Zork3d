@@ -55,6 +55,7 @@ Update this file when a decision or the room/item map changes meaningfully.
 | 43 | Auto-revealing a container's contents into inventory (the coffin/sceptre, egg/canary) doesn't award the item's one-time `value` bonus, even when the container was being carried at the moment it opened | Matches the source: `DEPOSIT-BOOTY`/`BAD-EGG` both use `MOVE`, not `SCORE-OBJ`, when contents spill out - only an explicit `take` scores a treasure's value. The practical effect: opening the coffin *before* picking it up (the natural order) scores the sceptre's value normally on a later explicit `take sceptre`; opening it *after* already carrying it skips that bonus, same edge case already accepted for the canary |
 | 44 | `diagnose` reports real current health and a real death count, but skips the source's wound-severity/cure-timer/survival-prediction text entirely | `V-DIAGNOSE` derives all of that from `FIGHT-STRENGTH`/`WINNER`'s `STRENGTH`/`I-CURE` - a whole strength-differential combat subsystem this game deliberately doesn't have (§1 decision 19, simple hit-point health instead). Reporting the two pieces that map cleanly onto what actually exists (`playerHealth` vs. max, `deaths`) rather than fabricating fake wound/cure numbers to fill out the rest of the source's output |
 | 45 | Automated regression suite (Vitest + `@testing-library/react`'s `renderHook`) drives the game entirely through `runCommand`/`restoreGame` rather than mocking internals | Exercises the same public surface a player (or the Playwright scripts used all session) actually uses, so the tests validate real behavior, not implementation details. `restoreGame`'s `localStorage` snapshot doubles as a test-only "teleport" to reach far-flung puzzle rooms (Treasure Room, End of Rainbow, Dome Room) without re-walking the full room graph in every test - it's the same "arbitrary state" entry point a player's own save file would produce, not a special test hook. `Math.random` is mocked deterministically per test; the one non-obvious gotcha (documented inline in `combat.test.js`) is that `randomPick()` itself burns an extra `Math.random()` call to choose flavor text, so a single combat round consumes up to 4 calls, not the 1-2 you'd guess from reading `attackTroll`/`attackThief` alone |
+| 46 | Visual atmosphere pass applied globally (postprocessing + relit lantern) rather than bespoke per-room art | User asked for "amazing visuals"; with 74 hand-built low-poly rooms, a real texture/asset overhaul isn't realistic in scope, but a `@react-three/postprocessing` `EffectComposer` (Bloom + Vignette, ACESFilmic tonemapping was already r3f's default), a `drei` `<Sky>` dome for every surface room, and a flickering lantern point light all apply once in `ViewportCanvas`/`EnvironmentLighting` and improve every room at once. Discovered along the way: three's lights are physically based (candela-scale, real inverse-square falloff) - the lantern's original `intensity={6}` (tuned for the old non-physical model) was barely reaching anything past ~2 units, so it's now `intensity=40` with a `decay={2}`/`distance={30}` falloff, plus a dim cool `ambientLight` (0.9) standing in for scotopic (dark-adapted) vision so cave walls read as dark shapes instead of flat black. A lit room's walls fading to black a few meters out is still correct (a real lantern doesn't floodlight a room) - the fix was making the *local* pool of light around the player actually look good, not eliminating falloff |
 
 **Standing engineering practice throughout:** every UI/behavior change in this
 project has been verified by actually running the app (`npm run dev` +
@@ -204,6 +205,26 @@ src/
 - `save`/`restore` use one fixed browser `localStorage` slot, not the source's disk-file save-game system - saving again overwrites the previous save, and there's no "load a different file" concept. Save data lives in the browser (clearing site data wipes it) rather than being portable between machines
 - The egg's fragility only has two outcomes (safely opened via the thief, or broken with the knife) - the source's other breakage triggers (dropping the nest/egg from Up a Tree, stepping on it, throwing it, `MUNG`) aren't wired up, since most need verbs (`THROW`, `MUNG`) this game doesn't have. `give` itself is scoped to the thief - there's no other NPC to give anything to, and it's not a general "hand item to person" system
 - The canary's own follow-on puzzle (`WIND` it in a forest room to summon a songbird that drops a brass bauble treasure) isn't modeled - the canary is just a real, takeable, scoreable treasure on its own once revealed, not a key that unlocks a further chain
+
+### 2.7 Visual style
+Low-poly primitives (boxes/planes, flat `meshStandardMaterial` colors, no
+textures) stay the per-room art style - see §1 decision 46 for why a full
+asset overhaul isn't in scope. On top of that baseline:
+- `ViewportCanvas` runs a global `@react-three/postprocessing`
+  `EffectComposer` on every room: `Bloom` (so the lantern/torch/sky
+  highlights actually glow) and `Vignette` (soft cinematic framing).
+  ACESFilmic tonemapping is r3f's own default, not something added here.
+- Surface rooms render a real `drei` `<Sky>` dome (warm, slightly low sun
+  angle) instead of a flat background color.
+- The lantern (`LanternLight`) flickers every frame (two out-of-phase
+  sine waves plus jitter, mutated directly on the light rather than via
+  React state) instead of holding a constant intensity.
+- Dungeon fog (`ViewportCanvas`'s `<fog>`) is tuned to 9-24 units - loose
+  enough that the brighter lantern's local pool of light is actually
+  visible before fog takes over, tight enough to still feel like a cave.
+
+### 2.8 Map and hints
+_(filled in once built - see backlog)_
 
 ---
 
