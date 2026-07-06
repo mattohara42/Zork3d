@@ -52,8 +52,8 @@ const HELP_TEXT =
   'examine <thing>, open/close <thing>, lock/unlock <thing>, take/drop ' +
   '<thing>, put <thing> in case, give <thing> to <someone>, tie <thing> ' +
   'to <thing>, untie <thing>, wave <thing>, rub <thing>, pray, read ' +
-  '<thing>, move <thing>, attack/kill <thing>, inventory, score, light ' +
-  'lamp / turn off lamp, save, restore, restart.';
+  '<thing>, move <thing>, attack/kill <thing>, inventory, score, ' +
+  'diagnose, light lamp / turn off lamp, save, restore, restart.';
 
 function resolveRoomText(room, flags, items, currentRoom) {
   const base = typeof room.text === 'function' ? room.text(flags) : room.text;
@@ -1464,6 +1464,30 @@ export function useGameState() {
     );
   }, [score, moves, log]);
 
+  /**
+   * V-DIAGNOSE, simplified. The source derives wound severity from a
+   * whole strength-differential/cure-timer subsystem (FIGHT-STRENGTH,
+   * WINNER's STRENGTH, I-CURE) that this game's simple hit-point combat
+   * (§1 decision 19) deliberately doesn't have, so there's no "cured
+   * after N moves" or "you can survive N more wounds" prediction here -
+   * just the player's actual current health, which (unlike the source)
+   * never heals on its own until it's reset by winning or losing a
+   * fight. The exact death count is real, though - `deaths` is tracked
+   * for real by the death mechanic.
+   */
+  const diagnoseVerb = useCallback(() => {
+    if (playerHealth >= PLAYER_MAX_HEALTH) {
+      log('You are in perfect health.');
+    } else if (playerHealth === PLAYER_MAX_HEALTH - 1) {
+      log('You have a light wound.');
+    } else {
+      log('You have serious wounds.');
+    }
+    if (deaths > 0) {
+      log(`You have been killed ${deaths === 1 ? 'once' : 'twice'}.`);
+    }
+  }, [playerHealth, deaths, log]);
+
   const setLampLit = useCallback(
     (lit) => {
       // Deliberately stricter than "reachable" (room-or-inventory): our
@@ -1590,6 +1614,10 @@ export function useGameState() {
         showScore();
         return;
       }
+      if (cmd === 'diagnose') {
+        diagnoseVerb();
+        return;
+      }
       if (cmd === 'ulysses' || cmd === 'odysseus') {
         incrementMoves();
         sayUlysses();
@@ -1713,6 +1741,7 @@ export function useGameState() {
       lookAround,
       showInventory,
       showScore,
+      diagnoseVerb,
       setLampLit,
       log,
       openObject,
