@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Ground, { GROUND_Y } from '../primitives/Ground';
 import ObjectLabel from '../primitives/ObjectLabel';
+import { DungeonWall } from '../3d/VisualKit';
 
 const WALL_COLOR = '#4a453c';
 const WALL_HEIGHT = 3.4;
@@ -41,14 +42,8 @@ export default function MirrorRoom({ onInteract }) {
   return (
     <group>
       <Ground color="#524c40" size={8} />
-      <mesh position={[-4, GROUND_Y + WALL_HEIGHT / 2, 0]}>
-        <boxGeometry args={[0.2, WALL_HEIGHT, 8]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
-      <mesh position={[4, GROUND_Y + WALL_HEIGHT / 2, 0]}>
-        <boxGeometry args={[0.2, WALL_HEIGHT, 8]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
+      <DungeonWall position={[-4, GROUND_Y + WALL_HEIGHT / 2, 0]} height={WALL_HEIGHT} depth={8} color={WALL_COLOR} />
+      <DungeonWall position={[4, GROUND_Y + WALL_HEIGHT / 2, 0]} height={WALL_HEIGHT} depth={8} color={WALL_COLOR} />
       <Mirror onInteract={onInteract} />
     </group>
   );

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Ground, { GROUND_Y } from '../primitives/Ground';
 import ObjectLabel from '../primitives/ObjectLabel';
+import { DungeonWall } from '../3d/VisualKit';
 
 const WALL_COLOR = '#d8d3c8';
 const WALL_HEIGHT = 3;
@@ -46,18 +47,15 @@ export default function Gallery({ items, onInteract }) {
     <group>
       <Ground color="#a89f8c" size={9} />
 
+      {/* Back wall stays plain, not DungeonWall - its stone blocks would
+          protrude enough to clip through the painting sitting flush
+          against it at z=-4.4. */}
       <mesh position={[0, WALL_CENTER_Y, -4.5]}>
         <boxGeometry args={[9, WALL_HEIGHT, 0.2]} />
         <meshStandardMaterial color={WALL_COLOR} />
       </mesh>
-      <mesh position={[-4.5, WALL_CENTER_Y, 0]}>
-        <boxGeometry args={[0.2, WALL_HEIGHT, 9]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
-      <mesh position={[4.5, WALL_CENTER_Y, 0]}>
-        <boxGeometry args={[0.2, WALL_HEIGHT, 9]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
+      <DungeonWall position={[-4.5, WALL_CENTER_Y, 0]} height={WALL_HEIGHT} color={WALL_COLOR} />
+      <DungeonWall position={[4.5, WALL_CENTER_Y, 0]} height={WALL_HEIGHT} color={WALL_COLOR} />
 
       {items.painting.location === 'gallery' && <Painting onInteract={onInteract} />}
     </group>

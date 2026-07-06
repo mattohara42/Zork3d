@@ -1,4 +1,5 @@
 import Ground, { GROUND_Y } from '../primitives/Ground';
+import { DungeonWall } from '../3d/VisualKit';
 
 const WALL_COLOR = '#4a4a52';
 const SIDE_WALL_HEIGHT = 3;
@@ -16,18 +17,20 @@ export default function LoudRoom() {
   return (
     <group>
       <Ground color="#524d47" size={11} />
-      <mesh position={[-4.5, SIDE_WALL_CENTER_Y, 0]}>
-        <boxGeometry args={[0.2, SIDE_WALL_HEIGHT, 9]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
-      <mesh position={[4.5, SIDE_WALL_CENTER_Y, 0]}>
-        <boxGeometry args={[0.2, SIDE_WALL_HEIGHT, 9]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
-      <mesh position={[0, GROUND_Y + BACK_WALL_HEIGHT / 2, -7]}>
-        <boxGeometry args={[11, BACK_WALL_HEIGHT, 0.5]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
+      <DungeonWall position={[-4.5, SIDE_WALL_CENTER_Y, 0]} height={SIDE_WALL_HEIGHT} color={WALL_COLOR} />
+      <DungeonWall position={[4.5, SIDE_WALL_CENTER_Y, 0]} height={SIDE_WALL_HEIGHT} color={WALL_COLOR} />
+      {/* Rotated 90° so DungeonWall's default thin-local-X/long-local-Z
+          shape lands thin-in-world-Z/long-in-world-X instead - what a
+          back wall (spanning the room's width) needs, versus the side
+          walls above which use the component's natural orientation. */}
+      <DungeonWall
+        position={[0, GROUND_Y + BACK_WALL_HEIGHT / 2, -7]}
+        rotation={[0, Math.PI / 2, 0]}
+        width={0.5}
+        height={BACK_WALL_HEIGHT}
+        depth={11}
+        color={WALL_COLOR}
+      />
     </group>
   );
 }

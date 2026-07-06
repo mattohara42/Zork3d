@@ -1,4 +1,5 @@
 import Ground, { GROUND_Y } from '../primitives/Ground';
+import { DungeonWall } from '../3d/VisualKit';
 
 const WALL_COLOR = '#3a352f';
 const WALL_HEIGHT = 3;
@@ -20,14 +21,8 @@ export default function EastOfChasm() {
         <meshStandardMaterial color="#000000" />
       </mesh>
 
-      <mesh position={[-4.5, WALL_CENTER_Y, 0]}>
-        <boxGeometry args={[0.2, WALL_HEIGHT, 9]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
-      <mesh position={[4.5, WALL_CENTER_Y, 0]}>
-        <boxGeometry args={[0.2, WALL_HEIGHT, 9]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
+      <DungeonWall position={[-4.5, WALL_CENTER_Y, 0]} height={WALL_HEIGHT} color={WALL_COLOR} />
+      <DungeonWall position={[4.5, WALL_CENTER_Y, 0]} height={WALL_HEIGHT} color={WALL_COLOR} />
     </group>
   );
 }

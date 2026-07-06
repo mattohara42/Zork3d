@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Ground, { GROUND_Y } from '../primitives/Ground';
 import ObjectLabel from '../primitives/ObjectLabel';
+import { DungeonWall } from '../3d/VisualKit';
 
 const WALL_COLOR = '#5a5248';
 const WALL_HEIGHT = 3.2;
@@ -30,12 +31,7 @@ function Cyclops() {
 // Once fled, a cyclops-sized hole opens in the east wall instead - a
 // hint of the Strange Passage beyond, not modeled as full depth.
 function BrokenWall() {
-  return (
-    <mesh position={[4.5, GROUND_Y + WALL_HEIGHT / 2, 0]}>
-      <boxGeometry args={[0.2, WALL_HEIGHT, 9]} />
-      <meshStandardMaterial color={WALL_COLOR} />
-    </mesh>
-  );
+  return <DungeonWall position={[4.5, GROUND_Y + WALL_HEIGHT / 2, 0]} height={WALL_HEIGHT} color={WALL_COLOR} />;
 }
 
 function OpeningLabel() {
@@ -65,10 +61,7 @@ export default function CyclopsRoom({ flags }) {
   return (
     <group>
       <Ground color="#4a4238" size={9} />
-      <mesh position={[-4.5, GROUND_Y + WALL_HEIGHT / 2, 0]}>
-        <boxGeometry args={[0.2, WALL_HEIGHT, 9]} />
-        <meshStandardMaterial color={WALL_COLOR} />
-      </mesh>
+      <DungeonWall position={[-4.5, GROUND_Y + WALL_HEIGHT / 2, 0]} height={WALL_HEIGHT} color={WALL_COLOR} />
       {flags.cyclopsFled ? <OpeningLabel /> : <BrokenWall />}
       {!flags.cyclopsFled && <Cyclops />}
     </group>
